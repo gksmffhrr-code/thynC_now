@@ -1,751 +1,719 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>월차별 가동율 변화</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<style>
-:root {
-  --bg:#f0f4f8;--surface:#fff;--border:#dde3ed;--border2:#c8d3e0;
-  --seoul1:#0ea5e9;--seoul2:#6366f1;--local1:#10b981;--local2:#f97316;--local4:#a855f7;--total:#f59e0b;
-  --hq-hospital:#1d4ed8;--hq-local:#9333ea;
-  --text:#1e293b;--dim:#64748b;--muted:#94a3b8;
-}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:24px 28px;font-size:14px;}
-.top-bar{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:12px;}
-.eyebrow{font-size:10px;font-weight:600;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-bottom:4px;}
-h1{font-size:22px;font-weight:700;letter-spacing:-0.5px;}
-h1 em{font-style:normal;color:var(--seoul1);}
-.sub-title{font-size:12px;color:var(--dim);margin-top:3px;}
-.nav-area{display:flex;flex-direction:column;gap:8px;align-items:flex-end;}
-.nav-row{display:flex;align-items:center;gap:8px;}
-.nav-label{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap;min-width:52px;text-align:right;}
-.tab-group{display:flex;gap:3px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:3px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.tab-btn{font-family:'Pretendard',sans-serif;font-size:11px;font-weight:600;padding:6px 13px;border:none;background:transparent;color:var(--dim);cursor:pointer;transition:all 0.15s;border-radius:6px;white-space:nowrap;}
-.tab-btn:hover:not(.active){background:var(--bg);color:var(--text);}
-.tab-btn.active{color:#fff;box-shadow:0 2px 5px rgba(0,0,0,0.12);}
-.tab-btn.active.t-all{background:#334155;}
-.tab-btn.active.t-hq-h{background:var(--hq-hospital);}
-.tab-btn.active.t-hq-l{background:var(--hq-local);}
-.tab-btn.active.t-s1{background:var(--seoul1);}
-.tab-btn.active.t-s2{background:var(--seoul2);}
-.tab-btn.active.t-l1{background:var(--local1);}
-.tab-btn.active.t-l2{background:var(--local2);}
-.tab-btn.active.t-l4{background:var(--local4);}
-#divNav{display:none;}
-#officeNav{display:none;}
-.content-tabs{display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);}
-.ctab{font-family:'Pretendard',sans-serif;font-size:12px;font-weight:600;padding:8px 20px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
-.ctab:hover{color:var(--text);}
-.ctab.active{color:var(--seoul1);border-bottom-color:var(--seoul1);}
-.kpi-row{display:grid;gap:10px;margin-bottom:14px;}
-.kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
-.kpi::before{content:'';position:absolute;left:0;top:0;right:0;height:3px;border-radius:10px 10px 0 0;}
-.kpi.s1::before{background:var(--seoul1);}.kpi.s2::before{background:var(--seoul2);}
-.kpi.l1::before{background:var(--local1);}.kpi.l2::before{background:var(--local2);}
-.kpi.l4::before{background:var(--local4);}
-.kpi.hq-h::before{background:var(--hq-hospital);}.kpi.hq-l::before{background:var(--hq-local);}
-.kpi.tot::before{background:var(--total);}
-.kpi.highlighted{box-shadow:0 0 0 2px var(--border2),0 4px 12px rgba(0,0,0,0.08);}
-.kpi-label{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
-.kpi-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;line-height:1;}
-.kpi.s1 .kpi-val{color:var(--seoul1);}.kpi.s2 .kpi-val{color:var(--seoul2);}
-.kpi.l1 .kpi-val{color:var(--local1);}.kpi.l2 .kpi-val{color:var(--local2);}
-.kpi.l4 .kpi-val{color:var(--local4);}
-.kpi.hq-h .kpi-val{color:var(--hq-hospital);}.kpi.hq-l .kpi-val{color:var(--hq-local);}
-.kpi.tot .kpi-val{color:var(--total);}
-.kpi-trend{font-size:9px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono',monospace;}
-.grid-2{display:grid;grid-template-columns:1fr 1.6fr;gap:14px;margin-bottom:14px;}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
-.card-title{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:12px;display:flex;align-items:center;gap:7px;}
-.card-title-dot{width:6px;height:6px;border-radius:50%;}
-.chart-bar{height:190px;}
-.chart-avg{height:280px;}
-#top5Section{margin-bottom:14px;}
-.top5-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
-.top5-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:5px;position:relative;}
-.top5-rank{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--muted);}
-.top5-rank.gold{color:#d97706;}.top5-rank.silver{color:#94a3b8;}.top5-rank.bronze{color:#b45309;}
-.top5-name{font-size:11px;font-weight:600;color:var(--text);line-height:1.3;word-break:keep-all;}
-.top5-office{font-size:9px;color:var(--muted);}
-.top5-val{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;margin-top:1px;}
-.top5-bar{height:3px;border-radius:2px;margin-top:3px;}
-#officeStripSection{margin-bottom:14px;}
-.office-strip{display:grid;gap:8px;}
-.office-kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
-.office-kpi-left{display:flex;flex-direction:column;gap:3px;}
-.office-kpi-name{font-size:11px;font-weight:700;color:var(--text);display:flex;align-items:center;flex-wrap:wrap;gap:4px;}
-.office-kpi-count{font-size:9px;color:var(--muted);}
-.office-kpi-right{display:flex;align-items:center;gap:10px;}
-.office-kpi-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;}
-.office-kpi-bar-wrap{width:70px;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;}
-.office-kpi-bar{height:100%;border-radius:3px;}
-.hm-container{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.hm-month-head{flex:1;font-size:9px;font-weight:600;color:var(--muted);text-align:center;}
-.hm-divider{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px;display:flex;align-items:center;gap:6px;}
-.hm-divider:first-child{border-top:none;margin-top:0;}
-.hm-hq-divider{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--text);padding:12px 0 4px;margin-top:8px;display:flex;align-items:center;gap:8px;}
-.hm-hq-divider:first-child{margin-top:0;padding-top:0;}
-.hm-hq-dot{width:9px;height:9px;border-radius:50%;}
-.hm-office-divider{font-size:12px;font-weight:700;color:var(--text);padding:8px 0 4px;margin-top:6px;display:flex;align-items:center;gap:6px;padding-left:4px;}
-.hm-office-avg{display:flex;gap:3px;margin-left:auto;align-items:center;}
-.hm-office-avg-cell{width:32px;height:18px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;border-radius:3px;}
-.hm-status{font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:4px;flex-shrink:0;}
-.hm-status.improving{background:#dcfce7;color:#16a34a;}
-.hm-status.danger{background:#fee2e2;color:#dc2626;}
-.hm-divider-dot{width:7px;height:7px;border-radius:50%;}
-.hm-row{display:flex;align-items:center;gap:3px;margin-bottom:2px;}
-.hm-name{font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:4px;flex-shrink:0;display:flex;align-items:center;gap:3px;}
-.hm-mgr{font-size:10px;color:var(--dim);white-space:nowrap;flex-shrink:0;padding-right:4px;}
-.hm-avg-row .hm-name{font-weight:700;font-size:10px;color:var(--dim);text-transform:uppercase;}
-.hm-cells{display:flex;gap:3px;flex:1;}
-.hm-cell{flex:1;height:22px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;border-radius:4px;transition:transform 0.1s;cursor:default;min-width:28px;}
-.hm-cell:hover{transform:scale(1.08);z-index:5;}
-.hm-cell.empty{background:#f1f5f9;}
-.hm-avg-row .hm-cell{height:24px;font-size:11px;}
-.hosp-table-wrap{overflow-x:auto;max-height:400px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
-.hosp-table{width:100%;border-collapse:collapse;font-size:12px;}
-.hosp-table thead{position:sticky;top:0;z-index:10;background:var(--surface);}
-.hosp-table th{padding:7px 9px;text-align:center;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;}
-.hosp-table th:nth-child(-n+5){text-align:left;}
-.hosp-table td{padding:6px 9px;text-align:center;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;color:var(--text);}
-.hosp-table td:nth-child(-n+5){text-align:left;font-family:'Pretendard',sans-serif;}
-.hosp-table tr:hover td{background:#f8faff;}
-.tag{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:0.5px;}
-.tag-s1{background:#e0f2fe;color:var(--seoul1);}.tag-s2{background:#ede9fe;color:var(--seoul2);}
-.tag-l1{background:#d1fae5;color:var(--local1);}.tag-l2{background:#ffedd5;color:var(--local2);}
-.tag-l4{background:#f3e8ff;color:var(--local4);}
-.tag-hq-h{background:#dbeafe;color:var(--hq-hospital);}.tag-hq-l{background:#f3e8ff;color:var(--hq-local);}
-.breadcrumb{font-size:11px;color:var(--dim);margin-bottom:10px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
-.breadcrumb span{font-weight:600;color:var(--text);}
-.breadcrumb .sep{color:var(--muted);font-size:10px;}
-::-webkit-scrollbar{width:5px;height:5px;}
-::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
-.footer{margin-top:18px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;}
-.footer-note{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
-@media(max-width:900px){.kpi-row{grid-template-columns:repeat(3,1fr) !important;}}
-@media(max-width:768px){
-  body{padding:14px 12px;}
-  .top-bar{flex-direction:column;}
-  h1{font-size:18px;}
-  .nav-area{align-items:flex-start;width:100%;}
-  .nav-row{width:100%;}
-  .nav-label{min-width:44px;}
-  .tab-group{flex:1;}
-  .kpi-row{grid-template-columns:repeat(2,1fr) !important;}
-  .kpi-val{font-size:20px;}
-  .top5-grid{grid-template-columns:repeat(2,1fr);}
-  .grid-2{grid-template-columns:1fr;}
-  .office-strip{grid-template-columns:repeat(2,1fr) !important;}
-  .office-kpi-bar-wrap{display:none;}
-}
-@media(max-width:480px){
-  .kpi-val{font-size:18px;}.top5-val{font-size:16px;}
-  .card{padding:12px;}.office-strip{grid-template-columns:1fr !important;}
-}
-</style>
-</head>
-<body>
+import { useState, useMemo } from "react";
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis,
+  Tooltip, ResponsiveContainer, CartesianGrid,
+  PieChart, Pie, Cell, Legend, ReferenceLine
+} from "recharts";
 
-<div class="top-bar">
-  <div>
-    <div class="eyebrow">Operational Dashboard</div>
-    <h1>월차별 <em>가동율</em> 변화</h1>
-    <div class="sub-title">본부 · 사업부별 병원 가동율 월차 추이 분석</div>
-  </div>
-  <div class="nav-area">
-    <div class="nav-row">
-      <span class="nav-label">본부</span>
-      <div class="tab-group" id="hqTabs">
-        <button class="tab-btn active t-all" onclick="setHQ('전체')">전체</button>
-        <button class="tab-btn t-hq-h" onclick="setHQ('병원본부')">병원본부</button>
-        <button class="tab-btn t-hq-l" onclick="setHQ('로컬본부')">로컬본부</button>
-      </div>
-    </div>
-    <div class="nav-row" id="divNav">
-      <span class="nav-label">사업부</span>
-      <div class="tab-group" id="divTabs"></div>
-    </div>
-    <div class="nav-row" id="officeNav">
-      <span class="nav-label">사무소</span>
-      <div class="tab-group" id="officeTabs"></div>
-    </div>
-  </div>
-</div>
-
-<div id="breadcrumb" class="breadcrumb"></div>
-
-<div class="content-tabs">
-  <button class="ctab active" onclick="setContent('dashboard')">📊 현황</button>
-  <button class="ctab" onclick="setContent('heatmap')">🗺 히트맵</button>
-  <button class="ctab" onclick="setContent('table')">📋 병원 목록</button>
-</div>
-
-<!-- DASHBOARD -->
-<div id="panel-dashboard">
-  <div class="kpi-row" id="kpiRow"></div>
-  <div id="top5Section" style="display:none;">
-    <div class="card" style="margin-bottom:14px;">
-      <div class="card-title"><span class="card-title-dot" id="top5Dot"></span><span id="top5Title">가동율 상위 5개 병원</span></div>
-      <div class="top5-grid" id="top5Grid"></div>
-    </div>
-  </div>
-  <div id="officeStripSection" style="display:none;">
-    <div class="card" style="margin-bottom:14px;">
-      <div class="card-title"><span class="card-title-dot" id="officeStripDot"></span><span id="officeStripTitle">사무소별 현황</span></div>
-      <div class="office-strip" id="officeStrip"></div>
-    </div>
-  </div>
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-title"><span class="card-title-dot" style="background:var(--local2)"></span>누적 평균 가동율</div>
-      <div style="position:relative;" class="chart-bar"><canvas id="barChart"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="card-title-dot" style="background:var(--total)"></span>평균 추이</div>
-      <div style="position:relative;" class="chart-avg"><canvas id="avgChart"></canvas></div>
-    </div>
-  </div>
-</div>
-
-<!-- HEATMAP -->
-<div id="panel-heatmap" style="display:none;">
-  <div class="card">
-    <div class="card-title"><span class="card-title-dot" id="hmDot" style="background:var(--seoul2)"></span><span id="hmTitle">가동율 히트맵</span></div>
-    <div class="hm-container" id="heatmapWrap"></div>
-  </div>
-</div>
-
-<!-- TABLE -->
-<div id="panel-table" style="display:none;">
-  <div class="card">
-    <div class="card-title"><span class="card-title-dot" style="background:var(--total)"></span><span id="tableTitle">전체 병원 목록</span></div>
-    <div class="hosp-table-wrap">
-      <table class="hosp-table">
-        <thead><tr>
-          <th>본부</th><th>사업부</th><th>사무소</th><th>담당자</th><th>병원명</th>
-          <th>1월차</th><th>2월차</th><th>3월차</th><th>4월차</th><th>5월차</th><th>6월차</th><th>7월차</th>
-          <th>누적평균</th>
-        </tr></thead>
-        <tbody id="hospTbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<div class="footer">
-  <div class="footer-note">월차별 가동율 변화 · 본부/사업부별 병원 현황</div>
-  <div class="footer-note" id="footerMeta"></div>
-</div>
-
-<script>
-var barLabelPlugin={id:'barLabels',afterDraw:function(chart){var ctx=chart.ctx;chart.data.datasets.forEach(function(ds,i){chart.getDatasetMeta(i).data.forEach(function(bar,idx){var v=ds.data[idx];if(v==null)return;var col=ds.borderColor;if(Array.isArray(col))col=col[idx];ctx.save();ctx.font='bold 12px "JetBrains Mono",monospace';ctx.fillStyle=col||'#334155';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(v+'%',bar.x,bar.y-4);ctx.restore();});});}};
-var lineLabelPlugin={id:'lineLabels',afterDraw:function(chart){var ctx=chart.ctx;chart.data.datasets.forEach(function(ds,i){var col=ds.borderColor||'#334155';chart.getDatasetMeta(i).data.forEach(function(pt,idx){var v=ds.data[idx];if(v==null)return;ctx.save();ctx.font='bold 11px "JetBrains Mono",monospace';ctx.fillStyle=col;ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(v+'%',pt.x,pt.y-8);ctx.restore();});});}};
-
-var MONTHS=['1월차','2월차','3월차','4월차','5월차','6월차','7월차'];
-var SHORT=['M1','M2','M3','M4','M5','M6','M7'];
-
-// ── 본부/사업부 계층 정의 ──
-var HQ_MAP={
-  '병원본부':['서울1','서울2','지방1','지방2'],
-  '로컬본부':['지방4']
+const MS = ["25.8","25.9","25.10","25.11","25.12","26.1","26.2","26.3"];
+const GC = {S:"#2563eb",A:"#3b82f6","B+":"#334155",B:"#475569",C:"#dc2626"};
+const GBG = {S:"#dbeafe",A:"#eff6ff","B+":"#f1f5f9",B:"#f8fafc",C:"#fef2f2"};
+const P = {
+  accent:"#2563eb",green:"#16a34a",red:"#dc2626",
+  amber:"#d97706",purple:"#7c3aed",cyan:"#0891b2",
+  text:"#0f172a",dim:"#475569",mute:"#94a3b8",
+  border:"#e2e8f0",blight:"#f1f5f9"
 };
-var HQ_KEYS=['병원본부','로컬본부'];
-var HQ_COLORS={'병원본부':'#1d4ed8','로컬본부':'#9333ea','전체':'#f59e0b'};
-var HQ_CLASS={'병원본부':'hq-h','로컬본부':'hq-l'};
-var HQ_TAG={'병원본부':'tag-hq-h','로컬본부':'tag-hq-l'};
-var HQ_TAB_CLASS={'병원본부':'t-hq-h','로컬본부':'t-hq-l'};
+const TT = {
+  background:"#0f172a",border:"1px solid #334155",
+  borderRadius:10,fontSize:12,color:"#f1f5f9",
+  boxShadow:"0 8px 30px rgba(0,0,0,.25)"
+};
 
-function getHQForDiv(div){
-  for(var i=0;i<HQ_KEYS.length;i++){if(HQ_MAP[HQ_KEYS[i]].indexOf(div)>=0)return HQ_KEYS[i];}
-  return null;
+function getGrade(v) {
+  if (v == null) return null;
+  if (v >= 70) return "S";
+  if (v >= 60) return "A";
+  if (v >= 50) return "B+";
+  if (v >= 40) return "B";
+  return "C";
 }
 
-var DIV_COLORS={'서울1':'#0ea5e9','서울2':'#6366f1','지방1':'#10b981','지방2':'#f97316','지방4':'#a855f7','전체':'#f59e0b'};
-var DIV_KEYS=['서울1','서울2','지방1','지방2','지방4'];
-var DIV_TAGS={'서울1':'tag-s1','서울2':'tag-s2','지방1':'tag-l1','지방2':'tag-l2','지방4':'tag-l4'};
-var DIV_CLASS={'서울1':'s1','서울2':'s2','지방1':'l1','지방2':'l2','지방4':'l4'};
-var DIV_TAB_CLASS={'서울1':'t-s1','서울2':'t-s2','지방1':'t-l1','지방2':'t-l2','지방4':'t-l4'};
+function calcAgg(list) {
+  const withMar = list.filter(x => x.r[7] != null);
+  const mar = withMar.length
+    ? withMar.reduce((a, x) => a + x.r[7], 0) / withMar.length
+    : null;
+  const withFeb = list.filter(x => x.r[6] != null);
+  const feb = withFeb.length
+    ? withFeb.reduce((a, x) => a + x.r[6], 0) / withFeb.length
+    : null;
+  return {
+    count: list.length,
+    beds: list.reduce((a, x) => a + x.b, 0),
+    active: withMar.length,
+    mar: mar,
+    feb: feb,
+    delta: (mar != null && feb != null) ? mar - feb : null
+  };
+}
 
-var ALL_HOSPITALS=[
-  // ── 1차 코호트 ─────────────────────────────────
-  // 서울1
-  {div:'서울1',office:'병원강원',  manager:'조현일',name:'여주새로운병원',                        vals:[14,34,28,31,null,null,null]},
-  {div:'서울1',office:'병원강원',  manager:'김한구',name:'의료법인성지의료재단성지병원',           vals:[5,33,44,null,null,null,null]},
-  {div:'서울1',office:'병원강원',  manager:'조현일',name:'의료법인선덕의료재단대성병원',           vals:[6,38,null,null,null,null,null]},
-  {div:'서울1',office:'병원강원',  manager:'조현일',name:'원주센텀병원',                          vals:[9,19,null,null,null,null,null]},
-  {div:'서울1',office:'병원경인',  manager:'김두성',name:'검단탑종합병원',                        vals:[42,36,35,22,23,15,null]},
-  {div:'서울1',office:'병원경인',  manager:'이효준',name:'김포우리병원',                          vals:[37,17,14,null,null,null,null]},
-  {div:'서울1',office:'병원서울2', manager:'황진하',name:'분당제생병원',                          vals:[31,24,null,null,null,null,null]},
-  // 서울2
-  {div:'서울2',office:'병원경기2', manager:'김남진',name:'동탄시티병원',                          vals:[4,17,32,29,null,null,null]},
-  {div:'서울2',office:'병원경기2', manager:'이창민',name:'의료법인백성의료재단안중백병원',        vals:[29,43,55,null,null,null,null]},
-  {div:'서울2',office:'병원경기2', manager:'이창민',name:'석경의료재단 센트럴병원',               vals:[5,2,null,null,null,null,null]},
-  {div:'서울2',office:'병원남부1', manager:'임효섭',name:'씨엠병원',                              vals:[7,21,31,null,null,null,null]},
-  {div:'서울2',office:'병원남부1', manager:'이정환',name:'사랑플러스병원',                        vals:[10,32,55,null,null,null,null]},
-  {div:'서울2',office:'병원동부',  manager:'김태인',name:'남양주21세기병원',                      vals:[8,10,10,16,10,null,null]},
-  {div:'서울2',office:'병원동부',  manager:'김형섭',name:'서울성심병원',                          vals:[20,33,26,null,null,null,null]},
-  {div:'서울2',office:'병원동부',  manager:'이선구',name:'양주예쓰병원',                          vals:[10,10,null,null,null,null,null]},
-  {div:'서울2',office:'병원동부',  manager:'이철민',name:'의료법인한양의료재단',                  vals:[72,25,null,null,null,null,null]},
-  {div:'서울2',office:'병원북부',  manager:'이삭',  name:'추병원',                                vals:[64,56,49,49,57,47,null]},
-  {div:'서울2',office:'병원북부',  manager:'최동식',name:'의료법인영동의료재단 의정부백병원',     vals:[15,14,21,23,null,null,null]},
-  {div:'서울2',office:'병원북부',  manager:'이영준',name:'신일병원',                              vals:[25,45,55,null,null,null,null]},
-  {div:'서울2',office:'병원북부',  manager:'문치호',name:'서울노보스병원',                        vals:[7,24,null,null,null,null,null]},
-  {div:'서울2',office:'병원중부1', manager:'이기범',name:'메디인병원',                            vals:[69,66,48,null,null,null,null]},
-  {div:'서울2',office:'제주',      manager:'홍창범',name:'의료법인혜인의료재단한국병원',          vals:[3,57,61,73,67,null,null]},
-  {div:'서울2',office:'제주',      manager:'홍창범',name:'제주한라병원',                          vals:[11,13,14,null,null,null,null]},
-  // 지방1
-  {div:'지방1',office:'병원대구1', manager:'오성훈',name:'의료법인백천의료재단 바로본병원',       vals:[74,82,93,88,null,null,null]},
-  {div:'지방1',office:'병원대구1', manager:'오성훈',name:'수성한미병원',                          vals:[12,29,42,null,null,null,null]},
-  {div:'지방1',office:'병원대구2', manager:'김혜원',name:'의료법인은성의료재단좋은선린병원',      vals:[23,51,38,null,null,null,null]},
-  {div:'지방1',office:'병원대구2', manager:'이지홍',name:'새천년병원(경주)',                      vals:[38,37,null,null,null,null,null]},
-  {div:'지방1',office:'병원대구2', manager:'양기호',name:'에스포항병원',                          vals:[47,null,null,null,null,null,null]},
-  {div:'지방1',office:'병원부산1', manager:'박큰솔',name:'서울산보람병원',                        vals:[6,43,37,39,null,null,null]},
-  {div:'지방1',office:'병원부산1', manager:'김주영',name:'의료법인온그룹의료재단온종합병원',      vals:[6,49,74,null,null,null,null]},
-  {div:'지방1',office:'병원부산2', manager:'임지훈',name:'빌리브세웅병원',                        vals:[19,22,22,24,33,35,49]},
-  {div:'지방1',office:'병원부산2', manager:'임지훈',name:'비에이치에스한서병원',                  vals:[2,10,10,15,28,35,null]},
-  {div:'지방1',office:'병원부산2', manager:'황지현',name:'세웅종합병원',                          vals:[19,76,48,66,66,null,null]},
-  {div:'지방1',office:'병원부산2', manager:'임지훈',name:'부산본병원',                            vals:[46,77,73,67,61,null,null]},
-  {div:'지방1',office:'병원부산2', manager:'김두환',name:'학교법인동의병원',                      vals:[7,null,null,null,null,null,null]},
-  // 지방2
-  {div:'지방2',office:'병원광주1', manager:'조현준',name:'화순성심병원',                          vals:[35,45,40,54,51,null,null]},
-  {div:'지방2',office:'병원광주1', manager:'이용선',name:'고흥윤호21병원',                        vals:[31,35,null,null,null,null,null]},
-  {div:'지방2',office:'병원광주1', manager:'김탄',  name:'KS병원',                                vals:[9,null,null,null,null,null,null]},
-  {div:'지방2',office:'병원광주2', manager:'정두리',name:'목포기독병원',                          vals:[0,2,10,12,null,null,null]},
-  {div:'지방2',office:'병원대전',  manager:'임혁',  name:'예산명지병원',                          vals:[9,43,34,42,49,45,28]},
-  {div:'지방2',office:'병원대전',  manager:'임혁',  name:'대전한국병원',                          vals:[2,10,13,20,23,22,null]},
-  {div:'지방2',office:'병원대전',  manager:'정지우',name:'당진종합병원',                          vals:[10,18,18,null,null,null,null]},
-  {div:'지방2',office:'병원대전',  manager:'정지현',name:'서산중앙병원',                          vals:[1,10,null,null,null,null,null]},
-  {div:'지방2',office:'병원대전',  manager:'정지우',name:'건양대부여병원',                        vals:[16,26,null,null,null,null,null]},
-  {div:'지방2',office:'병원대전',  manager:'김종현',name:'의료법인규웅의료재단(대청병원)',        vals:[27,73,null,null,null,null,null]},
-  {div:'지방2',office:'병원청주',  manager:'박지우',name:'천안리턴병원',                          vals:[39,47,55,49,56,51,null]},
-  {div:'지방2',office:'병원청주',  manager:'이진구',name:'현대병원(아산)',                        vals:[7,17,39,null,null,null,null]},
-  // ── 2차 코호트 ─────────────────────────────────
-  // 서울1
-  {div:'서울1',office:'병원서울1', manager:'김태완',name:'하남S병원',                             vals:[14,null,null,null,null,null,null]},
-  {div:'서울1',office:'병원서울3', manager:'왕유찬',name:'해븐리병원',                            vals:[5,13,17,null,null,null,null]},
-  {div:'서울1',office:'병원서울3', manager:'노성우',name:'신촌연세병원',                          vals:[10,21,20,null,null,null,null]},
-  {div:'서울1',office:'병원서울4', manager:'최성철',name:'중앙대광명병원',                        vals:[32,51,33,47,47,48,null]},
-  {div:'서울1',office:'병원인천',  manager:'나천',  name:'부평세림병원',                          vals:[16,null,null,null,null,null,null]},
-  // 서울2
-  {div:'서울2',office:'병원경기1', manager:'장철희',name:'의료법인명인의료재단(화홍병원)',        vals:[37,35,null,null,null,null,null]},
-  {div:'서울2',office:'병원동부',  manager:'김형섭',name:'청구성심병원',                          vals:[32,43,null,null,null,null,null]},
-  {div:'서울2',office:'병원중부1', manager:'이기범',name:'문산중앙병원',                          vals:[20,22,25,22,21,22,36]},
-  {div:'서울2',office:'병원중부2', manager:'김경열',name:'명지성모병원',                          vals:[1,null,null,null,null,null,null]},
-  // 지방1
-  {div:'지방1',office:'병원경남1', manager:'손준혁',name:'김해복음병원',                          vals:[1,22,27,null,null,null,null]},
-  {div:'지방1',office:'병원경남1', manager:'임채환',name:'새통영병원',                            vals:[4,2,null,null,null,null,null]},
-  {div:'지방1',office:'병원경남1', manager:'허재원',name:'김해굿모닝병원',                        vals:[5,4,null,null,null,null,null]},
-  {div:'지방1',office:'병원경남1', manager:'정성훈',name:'연세에스병원',                          vals:[5,null,null,null,null,null,null]},
-  {div:'지방1',office:'병원부산2', manager:'전경진',name:'의료법인혜명심의료재단(울산병원)',      vals:[22,26,null,null,null,null,null]},
-  {div:'지방1',office:'병원부산3', manager:'박규태',name:'한빛병원',                              vals:[3,26,null,null,null,null,null]},
-  // 지방2
-  {div:'지방2',office:'병원광주2', manager:'최송이',name:'광주시원병원',                          vals:[9,35,22,null,null,null,null]},
-  {div:'지방2',office:'병원광주2', manager:'박경환',name:'의료법인목포구암의료재단(목포중앙병원)',vals:[2,15,null,null,null,null,null]},
-  {div:'지방2',office:'병원광주2', manager:'주병옥',name:'동아병원',                              vals:[29,43,null,null,null,null,null]},
-  {div:'지방2',office:'병원광주2', manager:'최송이',name:'운암한국병원',                          vals:[9,null,null,null,null,null,null]},
-  {div:'지방2',office:'병원광주2', manager:'최송이',name:'광주한국병원',                          vals:[29,null,null,null,null,null,null]},
-  {div:'지방2',office:'병원청주',  manager:'이헌찬',name:'뿌리병원',                              vals:[13,52,null,null,null,null,null]},
-  // 지방4
-  {div:'지방4',office:'대전2',     manager:'권동후',name:'새손병원',                              vals:[10,null,null,null,null,null,null]},
+const SUM = [
+  {bu:"전체",type:"기존형",ct:63,tb:8356,ac:55,ab:7462,ca:27.75,
+   m:[14.18,29.09,25.64,33.32,29.27,32.50,35.37,29.49]},
+  {bu:"전체",type:"튜닝형",ct:70,tb:6484,ac:35,ab:3516,ca:20.07,
+   m:[20.04,26.89,37.68,27.71,15.40,20.33,22.74,23.59]},
+  {bu:"전체",type:"합계",ct:133,tb:14840,ac:90,ab:10978,ca:24.91,
+   m:[16.13,28.65,27.36,32.76,27.08,29.36,31.66,27.39]},
+  {bu:"서울1",type:"기존형",ct:12,tb:1830,ac:9,ab:1578,ca:19.84,
+   m:[null,41.70,35.53,24.64,19.32,19.92,27.82,18.53]},
+  {bu:"서울1",type:"튜닝형",ct:14,tb:907,ac:7,ab:472,ca:25.54,
+   m:[null,32.05,50.57,33.30,20.51,26.86,22.91,28.15]},
+  {bu:"서울1",type:"합계",ct:26,tb:2737,ac:16,ab:2050,ca:22.33,
+   m:[null,36.88,43.05,27.52,19.83,22.23,25.77,22.74]},
+  {bu:"서울2",type:"기존형",ct:20,tb:2725,ac:18,ab:2353,ca:27.97,
+   m:[null,63.55,22.56,26.94,28.33,31.38,32.63,29.43]},
+  {bu:"서울2",type:"튜닝형",ct:11,tb:1468,ac:8,ab:947,ca:21.53,
+   m:[20.04,21.74,24.78,22.13,20.85,30.09,28.67,24.92]},
+  {bu:"서울2",type:"합계",ct:31,tb:4193,ac:26,ab:3300,ca:25.99,
+   m:[20.04,42.64,23.12,26.14,27.80,31.18,31.84,28.04]},
+  {bu:"지방1",type:"기존형",ct:13,tb:1319,ac:12,ab:1249,ca:39.86,
+   m:[18.97,14.60,25.96,37.38,39.37,47.79,47.21,43.51]},
+  {bu:"지방1",type:"튜닝형",ct:24,tb:2366,ac:12,ab:1306,ca:13.19,
+   m:[null,null,null,null,0.80,11.02,15.12,15.82]},
+  {bu:"지방1",type:"합계",ct:37,tb:3685,ac:24,ab:2555,ca:26.53,
+   m:[18.97,14.60,25.96,37.38,35.08,35.53,36.51,29.67]},
+  {bu:"지방2",type:"기존형",ct:18,tb:2482,ac:16,ab:2282,ca:22.87,
+   m:[9.39,27.89,25.32,38.54,25.16,27.10,31.59,25.22]},
+  {bu:"지방2",type:"튜닝형",ct:17,tb:1574,ac:8,ab:791,ca:25.76,
+   m:[null,null,null,null,9.22,19.76,28.43,32.06]},
+  {bu:"지방2",type:"합계",ct:35,tb:4056,ac:24,ab:3073,ca:23.83,
+   m:[9.39,27.89,25.32,38.54,23.17,25.15,30.54,27.50]},
 ];
 
-// ── 상태 ──
-var currentHQ='전체',currentDiv='전체',currentOffice='전체',currentContent='dashboard';
-var barChart,avgChart;
+const HOSP = [
+{t:"기존",bu:"서울1",of:"병원강원",rp:"조현일",h:"여주새로운병원",b:40,r:[null,null,null,13.99,34.25,28.21,30.84,21.47],ca:25.75},
+{t:"기존",bu:"서울1",of:"병원강원",rp:"김한구",h:"추새로병원",b:30,r:[null,null,null,null,null,null,null,7.38],ca:7.38},
+{t:"기존",bu:"서울1",of:"병원강원",rp:"김한구",h:"성지의료재단성지병원",b:130,r:[null,null,null,null,4.88,33.04,44.06,27.4],ca:27.34},
+{t:"기존",bu:"서울1",of:"병원강원",rp:"조현일",h:"대성병원",b:100,r:[null,null,null,null,null,5.7,37.63,37.24],ca:26.86},
+{t:"기존",bu:"서울1",of:"병원강원",rp:"조현일",h:"원주센텀병원",b:30,r:[null,null,null,null,null,9.17,18.69,11.47],ca:13.11},
+{t:"기존",bu:"서울1",of:"병원강원",rp:"조현일",h:"원주 정병원",b:30,r:[null,null,null,null,null,null,null,6.58],ca:6.58},
+{t:"기존",bu:"서울1",of:"병원경인",rp:"김두성",h:"검단탑종합병원",b:280,r:[null,41.7,35.53,35.28,21.63,23.31,15.05,17.41],ca:27.13},
+{t:"기존",bu:"서울1",of:"병원경인",rp:"이효준",h:"김포우리병원",b:469,r:[null,null,null,null,16.53,20.06,17.43,14.02],ca:17.01},
+{t:"기존",bu:"서울1",of:"병원서울2",rp:"황진하",h:"분당제생병원",b:469,r:[null,null,null,null,null,null,31.01,23.78],ca:27.4},
+{t:"기존",bu:"서울2",of:"병원경기2",rp:"이창민",h:"평택성모병원",b:359,r:[null,null,null,null,null,null,null,27.56],ca:27.56},
+{t:"기존",bu:"서울2",of:"병원경기2",rp:"이창민",h:"센트럴병원",b:259,r:[null,null,null,null,null,5.39,2.42,34.93],ca:14.24},
+{t:"기존",bu:"서울2",of:"병원경기2",rp:"김남진",h:"동탄시티병원",b:90,r:[null,null,null,4.26,16.93,31.85,28.96,20.15],ca:20.43},
+{t:"기존",bu:"서울2",of:"병원경기2",rp:"이창민",h:"안중백병원",b:60,r:[null,null,null,null,29.21,42.92,55.1,50.02],ca:44.31},
+{t:"기존",bu:"서울2",of:"병원남부1",rp:"임효섭",h:"씨엠병원",b:105,r:[null,null,null,null,7.42,21.41,30.92,16.49],ca:19.06},
+{t:"기존",bu:"서울2",of:"병원남부1",rp:"이정환",h:"사랑플러스병원",b:40,r:[null,null,null,null,10.42,32.44,54.56,49.11],ca:36.63},
+{t:"기존",bu:"서울2",of:"병원남부1",rp:"이광현",h:"장튼위튼병원",b:30,r:[null,null,null,null,null,null,null,10.42],ca:10.42},
+{t:"기존",bu:"서울2",of:"병원동부",rp:"이철민",h:"한양의료재단",b:120,r:[null,null,null,null,44.53,27.93,25.12,27.96],ca:31.38},
+{t:"기존",bu:"서울2",of:"병원동부",rp:"이선구",h:"양주예쓰병원",b:100,r:[null,null,null,null,null,10.42,10.42,10.42],ca:10.42},
+{t:"기존",bu:"서울2",of:"병원동부",rp:"김형섭",h:"서울성심병원",b:80,r:[null,null,null,null,20.21,32.71,25.87,14.16],ca:23.24},
+{t:"기존",bu:"서울2",of:"병원동부",rp:"김태인",h:"남양주21세기병원",b:29,r:[null,null,8.3,10.42,10.42,15.63,10.42,14.48],ca:11.61},
+{t:"기존",bu:"서울2",of:"병원북부",rp:"이삭",h:"추병원",b:171,r:[null,63.55,56.03,48.57,48.86,57.31,47.25,45.38],ca:52.42},
+{t:"기존",bu:"서울2",of:"병원북부",rp:"문치호",h:"서울노보스병원",b:130,r:[null,null,null,null,null,6.63,24.49,15.58],ca:15.57},
+{t:"기존",bu:"서울2",of:"병원북부",rp:"최동식",h:"의정부백병원",b:100,r:[null,null,null,14.65,14.11,21.23,23.45,22.61],ca:19.21},
+{t:"기존",bu:"서울2",of:"병원북부",rp:"이영준",h:"신일병원",b:50,r:[null,null,null,null,24.85,44.64,54.59,40.94],ca:41.25},
+{t:"기존",bu:"서울2",of:"병원중부1",rp:"이기범",h:"메디인병원",b:30,r:[null,null,null,null,69.47,65.94,48.12,55.39],ca:59.73},
+{t:"기존",bu:"서울2",of:"제주",rp:"홍창범",h:"제주한라병원",b:500,r:[null,null,null,null,10.94,12.93,13.65,10.04],ca:11.89},
+{t:"기존",bu:"서울2",of:"제주",rp:"홍창범",h:"한국병원(제주)",b:100,r:[null,null,3.36,56.8,60.92,72.73,66.81,64.14],ca:54.13},
+{t:"기존",bu:"지방1",of:"병원대구1",rp:"오성훈",h:"바로본병원",b:50,r:[null,null,null,61.89,68.07,77.76,73.16,67.58],ca:69.69},
+{t:"기존",bu:"지방1",of:"병원대구1",rp:"오성훈",h:"수성한미병원",b:30,r:[null,null,null,null,11.58,29.24,41.61,29.66],ca:28.02},
+{t:"기존",bu:"지방1",of:"병원대구2",rp:"김혜원",h:"좋은선린병원",b:120,r:[null,null,null,null,23.35,51.08,37.69,36.28],ca:37.1},
+{t:"기존",bu:"지방1",of:"병원대구2",rp:"양기호",h:"에스포항병원",b:120,r:[null,null,null,null,null,null,46.51,49.91],ca:48.21},
+{t:"기존",bu:"지방1",of:"병원대구2",rp:"이지홍",h:"새천년병원(경주)",b:40,r:[null,null,null,null,null,37.68,37.21,33.67],ca:36.18},
+{t:"기존",bu:"지방1",of:"병원부산1",rp:"김주영",h:"온종합병원",b:39,r:[null,null,null,6.3,null,49.48,74.13,67.77],ca:49.42},
+{t:"기존",bu:"지방1",of:"병원부산1",rp:"박큰솔",h:"서울산보람병원",b:30,r:[null,null,null,5.52,43.03,37.06,38.71,37.2],ca:32.31},
+{t:"기존",bu:"지방1",of:"병원부산2",rp:"김두환",h:"동의병원",b:300,r:[null,null,null,null,null,null,6.58,10.42],ca:8.5},
+{t:"기존",bu:"지방1",of:"병원부산2",rp:"임지훈",h:"BHS한서병원",b:250,r:[null,1.88,10.42,10.42,15.44,28.32,34.81,38.4],ca:19.95},
+{t:"기존",bu:"지방1",of:"병원부산2",rp:"황지현",h:"세웅종합병원",b:100,r:[null,19.44,null,76.08,47.67,65.73,65.75,59.54],ca:55.7},
+{t:"기존",bu:"지방1",of:"병원부산2",rp:"임지훈",h:"빌리브세웅병원",b:140,r:[18.97,22.49,21.86,24.24,32.97,34.83,49.4,36.02],ca:30.1},
+{t:"기존",bu:"지방1",of:"병원부산2",rp:"임지훈",h:"부산본병원",b:30,r:[null,null,45.6,77.24,72.85,66.78,60.91,55.69],ca:63.18},
+{t:"기존",bu:"지방2",of:"병원광주1",rp:"조현준",h:"화순성심병원",b:150,r:[null,null,35.26,44.69,39.57,54.48,51.3,41.45],ca:44.46},
+{t:"기존",bu:"지방2",of:"병원광주1",rp:"이용선",h:"녹동현대병원",b:100,r:[null,null,null,null,null,null,null,2.65],ca:2.65},
+{t:"기존",bu:"지방2",of:"병원광주1",rp:"이용선",h:"고흥윤호21병원",b:70,r:[null,null,null,null,null,30.63,34.63,21.42],ca:28.89},
+{t:"기존",bu:"지방2",of:"병원광주1",rp:"김탄",h:"KS병원",b:30,r:[null,null,null,null,null,null,9.4,40.24],ca:24.82},
+{t:"기존",bu:"지방2",of:"병원광주2",rp:"정두리",h:"목포기독병원",b:280,r:[null,null,0.24,null,2.08,10.42,12.15,19.63],ca:8.9},
+{t:"기존",bu:"지방2",of:"병원대전",rp:"정지현",h:"서산중앙병원",b:288,r:[null,null,null,null,null,0.65,10.42,23.14],ca:11.4},
+{t:"기존",bu:"지방2",of:"병원대전",rp:"임혁",h:"대전한국병원",b:253,r:[null,2.12,10.42,12.94,19.96,22.55,21.93,15.54],ca:15.07},
+{t:"기존",bu:"지방2",of:"병원대전",rp:"정지우",h:"당진종합병원",b:160,r:[null,null,null,null,10.02,18.08,17.91,10.7],ca:14.18},
+{t:"기존",bu:"지방2",of:"병원대전",rp:"김종현",h:"대청병원",b:120,r:[null,null,null,null,null,26.86,73.19,67.97],ca:56.01},
+{t:"기존",bu:"지방2",of:"병원대전",rp:"임혁",h:"예산명지병원",b:100,r:[9.39,42.94,33.9,41.68,48.68,44.68,32.57,21.41],ca:34.4},
+{t:"기존",bu:"지방2",of:"병원대전",rp:"정지우",h:"건양대부여병원",b:40,r:[null,null,null,null,null,16.25,25.59,17.06],ca:19.64},
+{t:"기존",bu:"지방2",of:"병원전주",rp:"하완석",h:"원광대학교병원",b:255,r:[null,null,null,null,null,null,null,10.42],ca:10.42},
+{t:"기존",bu:"지방2",of:"병원청주",rp:"차재형",h:"아산충무병원",b:274,r:[null,null,null,null,null,null,null,7.2],ca:7.2},
+{t:"기존",bu:"지방2",of:"병원청주",rp:"이진구",h:"현대병원(아산)",b:84,r:[null,null,null,null,6.57,17.49,39.07,44.05],ca:26.79},
+{t:"기존",bu:"지방2",of:"병원청주",rp:"박지우",h:"천안리턴병원",b:48,r:[null,38.6,46.77,54.85,49.25,56.08,50.95,48.91],ca:49.34},
+{t:"기존",bu:"지방2",of:"병원청주",rp:"황수경",h:"제천성지병원",b:30,r:[null,null,null,null,null,null,null,11.69],ca:11.69},
+{t:"튜닝",bu:"서울1",of:"병원경인",rp:"국경호",h:"다니엘병원",b:52,r:[null,null,null,null,null,null,null,55.71],ca:55.71},
+{t:"튜닝",bu:"서울1",of:"병원서울1",rp:"김태완",h:"하남S병원",b:30,r:[null,null,null,null,null,null,13.78,25.22],ca:19.5},
+{t:"튜닝",bu:"서울1",of:"병원서울3",rp:"노성우",h:"신촌연세병원",b:72,r:[null,null,null,null,10.2,20.65,20.01,20.21],ca:17.77},
+{t:"튜닝",bu:"서울1",of:"병원서울3",rp:"왕유찬",h:"해븐리병원",b:117,r:[null,null,null,null,4.79,12.59,17.01,15.67],ca:12.52},
+{t:"튜닝",bu:"서울1",of:"병원서울4",rp:"최성철",h:"중앙대광명병원",b:12,r:[null,32.05,50.57,33.3,46.53,47.34,48.09,54.69],ca:44.65},
+{t:"튜닝",bu:"서울1",of:"병원인천",rp:"김형태",h:"국제성모병원",b:137,r:[null,null,null,null,null,null,null,16.11],ca:16.11},
+{t:"튜닝",bu:"서울1",of:"병원인천",rp:"나천",h:"부평세림병원",b:52,r:[null,null,null,null,null,null,15.67,9.43],ca:12.55},
+{t:"튜닝",bu:"서울2",of:"병원경기1",rp:"장철희",h:"화홍병원",b:191,r:[null,null,null,null,null,36.53,34.91,28.03],ca:33.16},
+{t:"튜닝",bu:"서울2",of:"병원경기1",rp:"장철희",h:"한도병원",b:100,r:[null,null,null,null,null,null,null,16.47],ca:16.47},
+{t:"튜닝",bu:"서울2",of:"병원동부",rp:"김태인",h:"엘병원",b:100,r:[null,null,null,null,null,null,null,22.3],ca:22.3},
+{t:"튜닝",bu:"서울2",of:"병원동부",rp:"김형섭",h:"청구성심병원",b:196,r:[null,null,null,null,null,32.11,43.13,37.41],ca:37.55},
+{t:"튜닝",bu:"서울2",of:"병원동부",rp:"임창희",h:"서울에이스병원",b:70,r:[null,null,null,null,null,null,null,16.27],ca:16.27},
+{t:"튜닝",bu:"서울2",of:"병원중부1",rp:"배중환",h:"서울대병원(임상)",b:30,r:[null,null,null,null,null,null,null,16.96],ca:16.96},
+{t:"튜닝",bu:"서울2",of:"병원중부1",rp:"이기범",h:"문산중앙병원",b:48,r:[20.04,21.74,24.78,22.13,20.85,21.63,35.62,60.67],ca:28.43},
+{t:"튜닝",bu:"서울2",of:"병원중부2",rp:"김경열",h:"명지성모병원",b:212,r:[null,null,null,null,null,null,1.0,1.24],ca:1.12},
+{t:"튜닝",bu:"지방1",of:"병원경남1",rp:"손준혁",h:"김해복음병원",b:200,r:[null,null,null,null,0.8,21.53,27.44,28.34],ca:19.53},
+{t:"튜닝",bu:"지방1",of:"병원경남1",rp:"임채환",h:"새통영병원",b:104,r:[null,null,null,null,null,4.01,2.07,12.39],ca:6.16},
+{t:"튜닝",bu:"지방1",of:"병원경남1",rp:"정성훈",h:"연세에스병원",b:40,r:[null,null,null,null,null,null,5.0,11.67],ca:8.33},
+{t:"튜닝",bu:"지방1",of:"병원경남1",rp:"허재원",h:"김해굿모닝병원",b:60,r:[null,null,null,null,null,4.94,4.0,4.39],ca:4.44},
+{t:"튜닝",bu:"지방1",of:"병원대구1",rp:"권근륜",h:"안동복주회복병원",b:210,r:[null,null,null,null,null,null,null,3.42],ca:3.42},
+{t:"튜닝",bu:"지방1",of:"병원대구2",rp:"김주형",h:"더필병원",b:60,r:[null,null,null,null,null,null,null,42.11],ca:42.11},
+{t:"튜닝",bu:"지방1",of:"병원부산1",rp:"이승헌",h:"나눔과행복병원",b:110,r:[null,null,null,null,null,null,null,16.94],ca:16.94},
+{t:"튜닝",bu:"지방1",of:"병원부산1",rp:"정원종",h:"부산센텀병원",b:177,r:[null,null,null,null,null,null,null,0.8],ca:0.8},
+{t:"튜닝",bu:"지방1",of:"병원부산2",rp:"전경진",h:"울산병원",b:112,r:[null,null,null,null,null,21.88,26.19,23.27],ca:23.78},
+{t:"튜닝",bu:"지방1",of:"병원부산3",rp:"김수민",h:"거인병원",b:70,r:[null,null,null,null,null,null,null,0.48],ca:0.48},
+{t:"튜닝",bu:"지방1",of:"병원부산3",rp:"박규태",h:"한빛병원",b:99,r:[null,null,null,null,null,2.71,26.02,35.1],ca:21.27},
+{t:"튜닝",bu:"지방1",of:"병원부산3",rp:"박규태",h:"해동병원",b:64,r:[null,null,null,null,null,null,null,10.99],ca:10.99},
+{t:"튜닝",bu:"지방2",of:"병원광주1",rp:"김정란",h:"해남우리병원",b:50,r:[null,null,null,null,null,null,null,29.16],ca:29.16},
+{t:"튜닝",bu:"지방2",of:"병원광주2",rp:"박경환",h:"목포중앙병원",b:264,r:[null,null,null,null,null,2.32,15.23,11.34],ca:9.63},
+{t:"튜닝",bu:"지방2",of:"병원광주2",rp:"주병옥",h:"동아병원",b:39,r:[null,null,null,null,null,28.61,43.38,55.41],ca:42.46},
+{t:"튜닝",bu:"지방2",of:"병원광주2",rp:"최송이",h:"운암한국병원",b:125,r:[null,null,null,null,null,null,8.85,35.36],ca:22.11},
+{t:"튜닝",bu:"지방2",of:"병원광주2",rp:"최송이",h:"광주한국병원",b:115,r:[null,null,null,null,null,null,28.96,45.62],ca:37.29},
+{t:"튜닝",bu:"지방2",of:"병원광주2",rp:"최송이",h:"광주시원병원",b:30,r:[null,null,null,null,9.22,35.11,22.33,31.89],ca:24.64},
+{t:"튜닝",bu:"지방2",of:"병원전주",rp:"박지산",h:"전주고려병원",b:40,r:[null,null,null,null,null,null,null,4.89],ca:4.89},
+{t:"튜닝",bu:"지방2",of:"병원청주",rp:"이헌찬",h:"뿌리병원",b:49,r:[null,null,null,null,null,12.99,51.85,42.78],ca:35.87},
+];
 
-// ── 유틸 ──
-function avg(arr){var v=arr.filter(function(x){return x!=null;});return v.length?v.reduce(function(a,b){return a+b;},0)/v.length:null;}
-function heatColor(v){
-  if(v==null)return{bg:'#f1f5f9',text:'transparent'};
-  if(v>=70)return{bg:'#dcfce7',text:'#16a34a'};
-  if(v>=60)return{bg:'#d1fae5',text:'#10b981'};
-  if(v>=40)return{bg:'#fef9c3',text:'#b45309'};
-  if(v>=20)return{bg:'#fee2e2',text:'#dc2626'};
-  return{bg:'#fecaca',text:'#991b1b'};
-}
-function getVisibleDivs(){
-  if(currentHQ==='전체')return DIV_KEYS.slice();
-  return HQ_MAP[currentHQ]||[];
-}
-function getOfficesForDiv(div){
-  var offices=[];
-  ALL_HOSPITALS.forEach(function(h){if(h.div===div&&offices.indexOf(h.office)<0)offices.push(h.office);});
-  return offices;
-}
-function getHospitals(){
-  var visibleDivs=getVisibleDivs();
-  return ALL_HOSPITALS.filter(function(h){
-    if(currentDiv!=='전체')return h.div===currentDiv&&(currentOffice==='전체'||h.office===currentOffice);
-    if(visibleDivs.indexOf(h.div)<0)return false;
-    if(currentOffice!=='전체'&&h.office!==currentOffice)return false;
-    return true;
-  });
-}
-function computeAvgs(hospitals){
-  var avgs={};
-  DIV_KEYS.forEach(function(div){
-    var hs=hospitals.filter(function(h){return h.div===div;});
-    avgs[div]=MONTHS.map(function(_,mi){
-      var vs=hs.map(function(h){return h.vals[mi];}).filter(function(v){return v!=null;});
-      return vs.length?Math.round(vs.reduce(function(a,b){return a+b;},0)/vs.length):null;
-    });
-  });
-  HQ_KEYS.forEach(function(hq){
-    var divs=HQ_MAP[hq];
-    avgs[hq]=MONTHS.map(function(_,mi){
-      var vs=[];divs.forEach(function(d){if(avgs[d][mi]!=null)vs.push(avgs[d][mi]);});
-      return vs.length?Math.round(vs.reduce(function(a,b){return a+b;},0)/vs.length):null;
-    });
-  });
-  avgs['전체']=MONTHS.map(function(_,mi){
-    var vs=DIV_KEYS.reduce(function(acc,d){return avgs[d][mi]!=null?acc.concat([avgs[d][mi]]):acc;},[]);
-    return vs.length?Math.round(vs.reduce(function(a,b){return a+b;},0)/vs.length):null;
-  });
-  return avgs;
+function Kpi({label, value, sub, delta, color}) {
+  return (
+    <div style={{background:"#fff",borderRadius:12,padding:"16px 20px",
+      border:"1px solid #e2e8f0",flex:1,minWidth:155,
+      boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+      <div style={{fontSize:10,fontWeight:700,color:P.mute,
+        textTransform:"uppercase",letterSpacing:1.2,marginBottom:6}}>
+        {label}
+      </div>
+      <div style={{fontSize:28,fontWeight:800,color:color||P.text,lineHeight:1.1}}>
+        {value}
+      </div>
+      {sub ? <div style={{fontSize:11,color:P.dim,marginTop:4}}>{sub}</div> : null}
+      {delta != null ? (
+        <div style={{fontSize:11,fontWeight:700,
+          color:delta >= 0 ? P.green : P.red,marginTop:4}}>
+          {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}%p vs 2월
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
-// ── 네비게이션 ──
-function renderBreadcrumb(){
-  var parts=['<span>전체</span>'];
-  if(currentHQ!=='전체')parts.push('<span>'+currentHQ+'</span>');
-  if(currentDiv!=='전체')parts.push('<span>'+currentDiv+'</span>');
-  if(currentOffice!=='전체')parts.push('<span>'+currentOffice+'</span>');
-  document.getElementById('breadcrumb').innerHTML=parts.join('<span class="sep">›</span>');
+function Badge({grade}) {
+  if (!grade) return <span style={{color:P.mute,fontSize:10}}>-</span>;
+  return (
+    <span style={{display:"inline-block",padding:"2px 7px",borderRadius:5,
+      fontSize:10,fontWeight:800,color:GC[grade],background:GBG[grade]}}>
+      {grade}
+    </span>
+  );
 }
 
-function renderDivNav(){
-  var nav=document.getElementById('divNav');
-  if(currentHQ==='전체'){nav.style.display='none';return;}
-  nav.style.display='flex';
-  var divs=getVisibleDivs();
-  var html='<button class="tab-btn'+(currentDiv==='전체'?' active t-all':'')+'" onclick="setDiv(\'전체\')">전체</button>';
-  divs.forEach(function(d){
-    var tc=DIV_TAB_CLASS[d]||'';
-    html+='<button class="tab-btn'+(currentDiv===d?' active '+tc:'')+'" onclick="setDiv(\''+d+'\')">'+d+'</button>';
-  });
-  document.getElementById('divTabs').innerHTML=html;
-}
-
-function renderOfficeNav(){
-  var nav=document.getElementById('officeNav');
-  if(currentDiv==='전체'){nav.style.display='none';return;}
-  nav.style.display='flex';
-  var offices=getOfficesForDiv(currentDiv);
-  var cls=DIV_CLASS[currentDiv]||'';
-  var html='<button class="tab-btn'+(currentOffice==='전체'?' active t-all':'')+'" onclick="setOffice(\'전체\')">전체</button>';
-  offices.forEach(function(o){
-    html+='<button class="tab-btn'+(currentOffice===o?' active t-'+cls:'')+'" onclick="setOffice(\''+o+'\')">'+o.replace('병원','')+'</button>';
-  });
-  document.getElementById('officeTabs').innerHTML=html;
-}
-
-// ── KPI ──
-function renderKPIs(){
-  var hospitals=getHospitals();
-  var avgs=computeAvgs(hospitals);
-  var row=document.getElementById('kpiRow');
-  var cards=[];
-
-  function makeCard(key,label,cls){
-    var a=avgs[key];if(!a)return;
-    var last=null;for(var i=a.length-1;i>=0;i--)if(a[i]!=null){last={val:a[i],idx:i};break;}
-    var valText='—',trendText='—',trendColor='';
-    if(last){
-      valText=last.val+'%';
-      var first=null;for(var j=0;j<a.length;j++)if(a[j]!=null){first={val:a[j],idx:j};break;}
-      if(first&&first.idx!==last.idx){
-        var diff=last.val-first.val;
-        trendText=(diff>=0?'▲ +':'▼ ')+diff+'%p (M'+(first.idx+1)+'→M'+(last.idx+1)+')';
-        trendColor=diff>=0?'#16a34a':'#dc2626';
-      } else {
-        trendText='M'+(last.idx+1)+' 기준';
-      }
-    }
-    cards.push('<div class="kpi '+cls+'"><div class="kpi-label">'+label+'</div><div class="kpi-val">'+valText+'</div><div class="kpi-trend" style="color:'+trendColor+'">'+trendText+'</div></div>');
+function RateCell({v}) {
+  if (v == null) {
+    return <td style={{padding:"4px 5px",textAlign:"center",color:P.mute,fontSize:10}}>-</td>;
   }
-
-  // 본부=전체, 사업부=전체: 본부별 KPI + 전체
-  if(currentHQ==='전체'&&currentDiv==='전체'){
-    HQ_KEYS.forEach(function(hq){makeCard(hq,hq,HQ_CLASS[hq]);});
-    makeCard('전체','전체','tot');
-    row.style.gridTemplateColumns='repeat('+cards.length+',1fr)';
-  }
-  // 본부 선택, 사업부=전체: 사업부별 KPI + 본부합계
-  else if(currentHQ!=='전체'&&currentDiv==='전체'){
-    getVisibleDivs().forEach(function(d){makeCard(d,d,DIV_CLASS[d]);});
-    makeCard(currentHQ,currentHQ+' 합계',HQ_CLASS[currentHQ]);
-    row.style.gridTemplateColumns='repeat('+cards.length+',1fr)';
-  }
-  // 사업부 선택: 사업부 KPI + 전체
-  else {
-    makeCard(currentDiv,currentDiv,DIV_CLASS[currentDiv]);
-    makeCard('전체','전체','tot');
-    row.style.gridTemplateColumns='repeat('+cards.length+',1fr)';
-  }
-  row.innerHTML=cards.join('');
+  const g = getGrade(v);
+  return (
+    <td style={{padding:"4px 5px",textAlign:"center",fontSize:10,
+      fontWeight:700,color:GC[g],background:GBG[g],borderRadius:3}}>
+      {v.toFixed(1)}
+    </td>
+  );
 }
 
-// ── 차트 ──
-function renderBarChart(){
-  var hospitals=getHospitals();
-  var avgs=computeAvgs(hospitals);
-  var keys,colors;
-  if(currentHQ==='전체'&&currentDiv==='전체'){
-    keys=HQ_KEYS;colors=HQ_COLORS;
-  } else if(currentHQ!=='전체'&&currentDiv==='전체'){
-    keys=getVisibleDivs();colors=DIV_COLORS;
-  } else {
-    keys=[currentDiv];colors=DIV_COLORS;
-  }
-  var datasets=keys.map(function(d){
-    var a=avg((avgs[d]||[]).filter(function(v){return v!=null;}));
-    return{label:d,data:[a!=null?Math.round(a):0],backgroundColor:(colors[d]||'#94a3b8')+'33',borderColor:colors[d]||'#94a3b8',borderWidth:2,borderRadius:6,barPercentage:0.6};
-  });
-  if(barChart)barChart.destroy();
-  barChart=new Chart(document.getElementById('barChart'),{
-    type:'bar',data:{labels:['누적 평균'],datasets:datasets},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:keys.length>1,labels:{font:{family:'Pretendard',size:11},usePointStyle:true,pointStyle:'circle'}},tooltip:{enabled:false}},scales:{y:{beginAtZero:true,max:100,ticks:{callback:function(v){return v+'%'},font:{family:'JetBrains Mono',size:10}},grid:{color:'#f1f5f9'}},x:{ticks:{font:{family:'Pretendard',size:11}},grid:{display:false}}}},
-    plugins:[barLabelPlugin]
-  });
+function SubTable({title, rows, labelKey}) {
+  return (
+    <div style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",
+      overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+      <div style={{padding:"14px 18px 10px",fontSize:13,fontWeight:700,
+        color:P.text,borderBottom:"1px solid #f1f5f9"}}>{title}</div>
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+        <thead>
+          <tr style={{background:"#f8fafc"}}>
+            <th style={{padding:"8px 14px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:10}}>
+              {labelKey === "bu" ? "사업부" : "사무소"}
+            </th>
+            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>처수</th>
+            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>병상</th>
+            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>가동</th>
+            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>3월</th>
+            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>2월</th>
+            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>변동</th>
+            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>등급</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => {
+            const g = getGrade(row.mar);
+            return (
+              <tr key={i} style={{borderBottom:"1px solid #f1f5f9"}}>
+                <td style={{padding:"8px 14px",fontWeight:600,fontSize:12}}>{row.label}</td>
+                <td style={{padding:"8px 8px",textAlign:"center",color:P.dim}}>{row.count}</td>
+                <td style={{padding:"8px 8px",textAlign:"center",color:P.dim}}>{row.beds.toLocaleString()}</td>
+                <td style={{padding:"8px 8px",textAlign:"center",color:P.dim}}>{row.active}</td>
+                <td style={{padding:"8px 8px",textAlign:"center",fontWeight:700,
+                  color:row.mar != null ? GC[g] : P.mute,
+                  background:row.mar != null ? GBG[g] : "transparent",borderRadius:4}}>
+                  {row.mar != null ? row.mar.toFixed(1) + "%" : "-"}
+                </td>
+                <td style={{padding:"8px 8px",textAlign:"center",color:P.dim}}>
+                  {row.feb != null ? row.feb.toFixed(1) + "%" : "-"}
+                </td>
+                <td style={{padding:"8px 8px",textAlign:"center",fontWeight:700,
+                  color:row.delta != null ? (row.delta >= 0 ? P.green : P.red) : P.mute}}>
+                  {row.delta != null ? (row.delta >= 0 ? "+" : "") + row.delta.toFixed(1) : "-"}
+                </td>
+                <td style={{padding:"8px 8px",textAlign:"center"}}><Badge grade={g} /></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
-function renderAvgChart(){
-  var hospitals=getHospitals();
-  var avgs=computeAvgs(hospitals);
-  var keys,colors;
-  if(currentHQ==='전체'&&currentDiv==='전체'){
-    keys=HQ_KEYS;colors=HQ_COLORS;
-  } else if(currentHQ!=='전체'&&currentDiv==='전체'){
-    keys=getVisibleDivs();colors=DIV_COLORS;
-  } else {
-    keys=[currentDiv];colors=DIV_COLORS;
-  }
-  var datasets=keys.map(function(d){
-    return{label:d,data:avgs[d]||[],borderColor:colors[d]||'#94a3b8',backgroundColor:(colors[d]||'#94a3b8')+'22',pointBackgroundColor:colors[d]||'#94a3b8',pointRadius:4,pointHoverRadius:6,tension:0.3,fill:false,spanGaps:false};
-  });
-  if(avgChart)avgChart.destroy();
-  avgChart=new Chart(document.getElementById('avgChart'),{
-    type:'line',data:{labels:SHORT,datasets:datasets},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:keys.length>1,labels:{font:{family:'Pretendard',size:11},usePointStyle:true,pointStyle:'circle'}},tooltip:{enabled:false}},scales:{y:{beginAtZero:true,max:60,ticks:{callback:function(v){return v+'%'},font:{family:'JetBrains Mono',size:10}},grid:{color:'#f1f5f9'}},x:{ticks:{font:{family:'Pretendard',size:11}},grid:{display:false}}}},
-    plugins:[lineLabelPlugin]
-  });
+function RankItem({x, i, isTop}) {
+  const color = isTop ? P.green : P.red;
+  const bg = isTop ? (i < 3 ? "#dcfce7" : "#f1f5f9") : "#fef2f2";
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,padding:"3px 0"}}>
+      <span style={{width:18,height:18,borderRadius:4,background:bg,
+        display:"flex",alignItems:"center",justifyContent:"center",
+        fontSize:9,fontWeight:800,color:isTop ? (i < 3 ? P.green : P.mute) : P.red,
+        flexShrink:0}}>{i + 1}</span>
+      <span style={{flex:1,fontSize:11,fontWeight:500,overflow:"hidden",
+        textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.h}</span>
+      <span style={{fontSize:9,color:P.mute,flexShrink:0}}>{x.bu}</span>
+      <span style={{fontSize:9,padding:"1px 5px",borderRadius:3,
+        color:x.t === "기존" ? P.cyan : P.purple,
+        background:x.t === "기존" ? "#ecfeff" : "#f5f3ff",
+        flexShrink:0,fontWeight:700}}>{x.t}</span>
+      <span style={{fontSize:11,fontWeight:800,color:color,
+        width:48,textAlign:"right",flexShrink:0}}>
+        {x.r[7] != null ? x.r[7].toFixed(1) + "%" : "-"}
+      </span>
+      <Badge grade={getGrade(x.r[7])} />
+    </div>
+  );
 }
 
-// ── Top5 ──
-function renderTop5(){
-  var sec=document.getElementById('top5Section');
-  if(currentHQ==='전체'&&currentDiv==='전체'){sec.style.display='none';return;}
-  sec.style.display='';
-  var col;
-  if(currentDiv!=='전체') col=DIV_COLORS[currentDiv];
-  else col=HQ_COLORS[currentHQ];
-  document.getElementById('top5Dot').style.background=col;
-  var label=currentDiv!=='전체'?currentDiv:currentHQ;
-  document.getElementById('top5Title').textContent=label+' 가동율 상위 5개 병원';
-  var hospitals=getHospitals();
-  var ranked=hospitals.map(function(h){var a=avg(h.vals);return{name:h.name,office:h.office,div:h.div,avg:a};}).filter(function(h){return h.avg!=null;});
-  ranked.sort(function(a,b){return b.avg-a.avg;});
-  var top=ranked.slice(0,5);
-  var maxVal=top.length?top[0].avg:100;
-  var rankCls=['gold','silver','bronze','',''];
-  var html='';
-  top.forEach(function(h,i){
-    html+='<div class="top5-card"><div class="top5-rank '+rankCls[i]+'">'+String(i+1).padStart(2,'0')+'</div>';
-    html+='<div class="top5-name">'+h.name+'</div>';
-    html+='<div class="top5-office">'+h.div+' · '+h.office+'</div>';
-    html+='<div class="top5-val" style="color:'+col+'">'+Math.round(h.avg)+'%</div>';
-    html+='<div class="top5-bar" style="background:'+col+'33;"><div style="width:'+Math.round(h.avg/maxVal*100)+'%;height:100%;background:'+col+';border-radius:2px;"></div></div></div>';
-  });
-  document.getElementById('top5Grid').innerHTML=html;
-}
+export default function Dashboard() {
+  const [selBU, setSelBU] = useState("전체");
+  const [tf, setTf] = useState("합계");
+  const [tab, setTab] = useState("overview");
 
-// ── 사무소 스트립 ──
-function renderOfficeStrip(){
-  var sec=document.getElementById('officeStripSection');
-  if(currentDiv==='전체'&&currentHQ==='전체'){sec.style.display='none';return;}
-  // 사업부 선택됐으면 사무소 현황, 본부만 선택됐으면 사업부 현황
-  if(currentDiv!=='전체'){
-    sec.style.display='';
-    var col=DIV_COLORS[currentDiv];
-    document.getElementById('officeStripDot').style.background=col;
-    document.getElementById('officeStripTitle').textContent=currentDiv+' 사무소별 현황';
-    var offices=getOfficesForDiv(currentDiv);
-    var hospitals=ALL_HOSPITALS.filter(function(h){return h.div===currentDiv;});
-    var cols=Math.min(offices.length,4);
-    var strip=document.getElementById('officeStrip');
-    strip.style.gridTemplateColumns='repeat('+cols+',1fr)';
-    var html='';
-    offices.forEach(function(o){
-      var hs=hospitals.filter(function(h){return h.office===o;});
-      var allVals=[];hs.forEach(function(h){h.vals.forEach(function(v){if(v!=null)allVals.push(v);});});
-      var a=allVals.length?Math.round(allVals.reduce(function(s,v){return s+v;},0)/allVals.length):null;
-      html+='<div class="office-kpi" onclick="setOffice(\''+o+'\')" style="cursor:pointer;">';
-      html+='<div class="office-kpi-left"><div class="office-kpi-name">'+o.replace('병원','')+'</div><div class="office-kpi-count">'+hs.length+'개 병원</div></div>';
-      html+='<div class="office-kpi-right"><div class="office-kpi-val" style="color:'+col+'">'+(a!=null?a+'%':'—')+'</div>';
-      html+='<div class="office-kpi-bar-wrap"><div class="office-kpi-bar" style="width:'+(a||0)+'%;background:'+col+';"></div></div></div></div>';
-    });
-    strip.innerHTML=html;
-  } else if(currentHQ!=='전체'){
-    sec.style.display='';
-    var col=HQ_COLORS[currentHQ];
-    document.getElementById('officeStripDot').style.background=col;
-    document.getElementById('officeStripTitle').textContent=currentHQ+' 사업부별 현황';
-    var divs=getVisibleDivs();
-    var strip=document.getElementById('officeStrip');
-    strip.style.gridTemplateColumns='repeat('+Math.min(divs.length,4)+',1fr)';
-    var html='';
-    divs.forEach(function(d){
-      var hs=ALL_HOSPITALS.filter(function(h){return h.div===d;});
-      var allVals=[];hs.forEach(function(h){h.vals.forEach(function(v){if(v!=null)allVals.push(v);});});
-      var a=allVals.length?Math.round(allVals.reduce(function(s,v){return s+v;},0)/allVals.length):null;
-      var dc=DIV_COLORS[d];
-      html+='<div class="office-kpi" onclick="setDiv(\''+d+'\')" style="cursor:pointer;">';
-      html+='<div class="office-kpi-left"><div class="office-kpi-name"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+dc+';margin-right:4px;"></span>'+d+'</div><div class="office-kpi-count">'+hs.length+'개 병원</div></div>';
-      html+='<div class="office-kpi-right"><div class="office-kpi-val" style="color:'+dc+'">'+(a!=null?a+'%':'—')+'</div>';
-      html+='<div class="office-kpi-bar-wrap"><div class="office-kpi-bar" style="width:'+(a||0)+'%;background:'+dc+';"></div></div></div></div>';
-    });
-    strip.innerHTML=html;
-  }
-}
+  const filtered = useMemo(() => {
+    let l = HOSP;
+    if (selBU !== "전체") l = l.filter(x => x.bu === selBU);
+    if (tf === "기존형") l = l.filter(x => x.t === "기존");
+    else if (tf === "튜닝형") l = l.filter(x => x.t === "튜닝");
+    return l;
+  }, [selBU, tf]);
 
-// ── 히트맵 ──
-function renderHeatmap(){
-  var hospitals=getHospitals();
-  var wrap=document.getElementById('heatmapWrap');
-  var nameW='220px';var mgrW='70px';
-  var html='<div style="min-width:600px;">';
-  // header
-  html+='<div style="display:flex;align-items:center;gap:3px;margin-bottom:6px;"><div style="width:'+nameW+';flex-shrink:0;"></div><div style="width:'+mgrW+';flex-shrink:0;"></div><div style="display:flex;gap:3px;flex:1;">';
-  MONTHS.forEach(function(m){html+='<div class="hm-month-head">'+m+'</div>';});
-  html+='</div></div>';
-  // group by HQ then div then office
-  var hqs=currentHQ==='전체'?HQ_KEYS:[currentHQ];
-  hqs.forEach(function(hq){
-    var hqDivs=(currentDiv!=='전체')?[currentDiv]:HQ_MAP[hq];
-    var hqHospitals=hospitals.filter(function(h){return hqDivs.indexOf(h.div)>=0;});
-    if(!hqHospitals.length)return;
-    html+='<div class="hm-hq-divider"><span class="hm-hq-dot" style="background:'+HQ_COLORS[hq]+'"></span>'+hq+' ('+hqHospitals.length+')</div>';
-    hqDivs.forEach(function(d){
-      var dHs=hqHospitals.filter(function(h){return h.div===d;});
-      if(!dHs.length)return;
-      html+='<div class="hm-divider"><span class="hm-divider-dot" style="background:'+DIV_COLORS[d]+'"></span>'+d+' ('+dHs.length+')</div>';
-      var offices=[];dHs.forEach(function(h){if(offices.indexOf(h.office)<0)offices.push(h.office);});
-      offices.forEach(function(o){
-        var oHs=dHs.filter(function(h){return h.office===o;});
-        // compute office avgs for inline display
-        var oAvgs=MONTHS.map(function(_,mi){
-          var vs=oHs.map(function(h){return h.vals[mi];}).filter(function(v){return v!=null;});
-          return vs.length?Math.round(vs.reduce(function(a,b){return a+b;},0)/vs.length):null;
-        });
-        html+='<div class="hm-office-divider"><span class="hm-divider-dot" style="background:'+DIV_COLORS[d]+';width:7px;height:7px;"></span>'+o.replace('병원','')+' <span style="font-weight:400;color:var(--muted);font-size:10px;">('+oHs.length+')</span>';
-        html+='<div class="hm-office-avg">';
-        oAvgs.forEach(function(v){
-          var c=heatColor(v);
-          html+='<div class="hm-office-avg-cell" style="background:'+c.bg+';color:'+c.text+';">'+(v!=null?v:'')+'</div>';
-        });
-        html+='</div></div>';
-        oHs.forEach(function(h){
-          // determine status
-          var valid=[];h.vals.forEach(function(v,i){if(v!=null)valid.push({v:v,i:i});});
-          var statusHtml='';
-          if(valid.length>=2){
-            var first=valid[0].v,last=valid[valid.length-1].v;
-            if(last>first)statusHtml='<span class="hm-status improving">개선중</span>';
-            else if(last<first)statusHtml='<span class="hm-status danger">위험</span>';
-          }
-          html+='<div class="hm-row"><div class="hm-name" style="width:'+nameW+'">'+h.name+statusHtml+'</div><div class="hm-mgr" style="width:'+mgrW+'">'+h.manager+'</div><div class="hm-cells">';
-          h.vals.forEach(function(v){
-            var c=heatColor(v);
-            html+='<div class="hm-cell'+(v==null?' empty':'')+'" style="background:'+c.bg+';color:'+c.text+';">'+(v!=null?v+'%':'')+'</div>';
-          });
-          html+='</div></div>';
-        });
+  const kpi = useMemo(() => {
+    const a = calcAgg(filtered);
+    const s = SUM.find(x => x.bu === (selBU !== "전체" ? selBU : "전체") && x.type === tf)
+      || SUM.find(x => x.bu === "전체" && x.type === "합계");
+    return { ...a, contracts: s ? s.ct : a.count, totalBeds: s ? s.tb : a.beds, cumAvg: s ? s.ca : 0 };
+  }, [filtered, selBU, tf]);
+
+  const trendData = useMemo(() => {
+    const bu = selBU !== "전체" ? selBU : "전체";
+    return MS.map((m, i) => {
+      const row = { month: m };
+      ["합계","기존형","튜닝형"].forEach(t => {
+        const s = SUM.find(x => x.bu === bu && x.type === t);
+        if (s) row[t] = s.m[i];
       });
+      return row;
     });
-  });
-  html+='</div>';
-  wrap.innerHTML=html;
-  var col=currentDiv!=='전체'?DIV_COLORS[currentDiv]:currentHQ!=='전체'?HQ_COLORS[currentHQ]:HQ_COLORS['전체'];
-  document.getElementById('hmDot').style.background=col;
-  var title=currentDiv!=='전체'?currentDiv:currentHQ!=='전체'?currentHQ:'전체';
-  document.getElementById('hmTitle').textContent=title+' 가동율 히트맵';
-}
+  }, [selBU]);
 
-// ── 테이블 ──
-function renderTable(){
-  var hospitals=getHospitals();
-  var tbody=document.getElementById('hospTbody');
-  var html='';
-  hospitals.forEach(function(h){
-    var a=avg(h.vals);
-    var hq=getHQForDiv(h.div);
-    var hqTag=HQ_TAG[hq]||'';
-    var divTag=DIV_TAGS[h.div]||'';
-    html+='<tr><td><span class="tag '+hqTag+'">'+(hq||'')+'</span></td><td><span class="tag '+divTag+'">'+h.div+'</span></td><td>'+h.office+'</td><td>'+h.manager+'</td><td>'+h.name+'</td>';
-    h.vals.forEach(function(v){
-      if(v!=null){var c=heatColor(v);html+='<td style="color:'+c.text+';font-weight:600;">'+v+'%</td>';}
-      else{html+='<td style="color:#cbd5e1;">—</td>';}
-    });
-    html+='<td style="font-weight:700;color:'+(a!=null&&a>=40?'#16a34a':a!=null?'#dc2626':'#94a3b8')+';">'+(a!=null?Math.round(a)+'%':'—')+'</td></tr>';
-  });
-  tbody.innerHTML=html;
-  var parts=[];
-  if(currentHQ!=='전체')parts.push(currentHQ);
-  if(currentDiv!=='전체')parts.push(currentDiv);
-  if(currentOffice!=='전체')parts.push(currentOffice);
-  var label=parts.length?parts.join(' · '):'전체';
-  document.getElementById('tableTitle').textContent=label+' 병원 목록 ('+hospitals.length+'개)';
-}
+  const buRows = useMemo(() => {
+    const bus = ["서울1","서울2","지방1","지방2"];
+    return bus.map(bu => {
+      let l = HOSP.filter(x => x.bu === bu);
+      if (tf === "기존형") l = l.filter(x => x.t === "기존");
+      else if (tf === "튜닝형") l = l.filter(x => x.t === "튜닝");
+      if (!l.length) return null;
+      return { label: bu, ...calcAgg(l) };
+    }).filter(Boolean);
+  }, [tf]);
 
-// ── 네비게이션 액션 ──
-function setHQ(hq){
-  currentHQ=hq;currentDiv='전체';currentOffice='전체';
-  // update HQ tab active state
-  var btns=document.querySelectorAll('#hqTabs .tab-btn');
-  btns.forEach(function(b){b.classList.remove('active');});
-  var idx=['전체'].concat(HQ_KEYS).indexOf(hq);
-  if(idx>=0&&btns[idx])btns[idx].classList.add('active');
-  render();
+  const officeRows = useMemo(() => {
+    if (selBU === "전체") return [];
+    let l = HOSP.filter(x => x.bu === selBU);
+    if (tf === "기존형") l = l.filter(x => x.t === "기존");
+    else if (tf === "튜닝형") l = l.filter(x => x.t === "튜닝");
+    const offices = [...new Set(l.map(x => x.of))].sort();
+    return offices.map(of => ({ label: of, ...calcAgg(l.filter(x => x.of === of)) }));
+  }, [selBU, tf]);
+
+  const gradeDist = useMemo(() => {
+    const g = { S:0, A:0, "B+":0, B:0, C:0 };
+    filtered.forEach(x => { const v = getGrade(x.r[7]); if (v) g[v]++; });
+    return Object.entries(g).map(([n, v]) => ({ name: n, value: v })).filter(d => d.value > 0);
+  }, [filtered]);
+
+  const topBot = useMemo(() => {
+    const w = filtered.filter(x => x.r[7] != null).sort((a, b) => b.r[7] - a.r[7]);
+    return { top: w.slice(0, 10), bottom: w.slice(-10).reverse() };
+  }, [filtered]);
+
+  const sorted = useMemo(
+    () => [...filtered].sort((a, b) => (b.r[7] != null ? b.r[7] : -1) - (a.r[7] != null ? a.r[7] : -1)),
+    [filtered]
+  );
+
+  const titleLabel = selBU !== "전체" ? selBU : "전체";
+
+  const buCmp = useMemo(() => {
+    const bus = ["서울1","서울2","지방1","지방2"];
+    return bus.map(bu => {
+      const s = SUM.find(x => x.bu === bu && x.type === tf);
+      if (!s) return null;
+      const feb = s.m[6];
+      const mar = s.m[7];
+      return { bu, feb, mar, delta: mar != null && feb != null ? mar - feb : null };
+    }).filter(Boolean);
+  }, [tf]);
+
+  const navBus = ["서울1","서울2","지방1","지방2"];
+
+  const btnStyle = (active) => ({
+    padding:"5px 12px",borderRadius:7,fontSize:12,
+    fontWeight:active ? 700 : 500,cursor:"pointer",
+    background:active ? P.accent : "#fff",
+    color:active ? "#fff" : P.dim,
+    border: "1px solid " + (active ? P.accent : P.border)
+  });
+
+  return (
+    <div style={{background:"#f8fafc",minHeight:"100vh",color:P.text,
+      fontFamily:"system-ui,sans-serif",padding:"20px 24px"}}>
+
+      <div style={{display:"flex",justifyContent:"space-between",
+        alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:20}}>
+        <div>
+          <div style={{fontSize:10,fontWeight:700,color:P.accent,
+            letterSpacing:2,textTransform:"uppercase",marginBottom:2}}>
+            thynC 경영진 보고
+          </div>
+          <h1 style={{fontSize:22,fontWeight:800,margin:0}}>
+            사용량 비례형 병상가동률 대시보드
+          </h1>
+          <div style={{fontSize:11,color:P.mute,marginTop:2}}>
+            {"26.03.30 기준 · S≥70% · A≥60% · B+≥50% · B≥40% · C<40%"}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          {["합계","기존형","튜닝형"].map(t => (
+            <button key={t} onClick={() => setTf(t)} style={{
+              padding:"6px 14px",borderRadius:8,fontSize:12,
+              fontWeight:tf === t ? 700 : 500,cursor:"pointer",
+              background:tf === t ? (t === "기존형" ? "#ecfeff" : t === "튜닝형" ? "#f5f3ff" : "#eff6ff") : "#fff",
+              color:tf === t ? (t === "기존형" ? P.cyan : t === "튜닝형" ? P.purple : P.accent) : P.mute,
+              border:"1.5px solid " + (tf === t ? (t === "기존형" ? P.cyan : t === "튜닝형" ? P.purple : P.accent) : P.border)
+            }}>
+              {t === "합계" ? "기존+튜닝" : t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16,alignItems:"center"}}>
+        <span style={{fontSize:10,color:P.mute,fontWeight:700}}>사업부</span>
+        <button onClick={() => setSelBU("전체")} style={btnStyle(selBU === "전체")}>전체</button>
+        {navBus.map(bu => (
+          <button key={bu}
+            onClick={() => setSelBU(bu)}
+            style={btnStyle(selBU === bu)}>
+            {bu}
+          </button>
+        ))}
+      </div>
+
+      <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
+        <Kpi label="3월 가동률"
+          value={kpi.mar != null ? kpi.mar.toFixed(1) + "%" : "-"}
+          delta={kpi.delta}
+          color={kpi.mar >= 40 ? P.green : kpi.mar >= 25 ? P.amber : P.red} />
+        <Kpi label="계약 처수" value={kpi.contracts}
+          sub={"가동 " + kpi.active + "개 처"} />
+        <Kpi label="누계 병상수" value={kpi.totalBeds.toLocaleString()}
+          sub={"가동 " + kpi.beds.toLocaleString() + " 병상"} />
+        <Kpi label="누적 평균" value={kpi.cumAvg.toFixed(1) + "%"}
+          color={P.amber} sub={titleLabel + " · " + tf} />
+      </div>
+
+      <div style={{display:"flex",gap:2,marginBottom:18,borderBottom:"2px solid #e2e8f0"}}>
+        {[["overview","종합 현황"],["trend","월별 추이"],["hospitals","거래처 상세"]].map(([k, l]) => (
+          <button key={k} onClick={() => setTab(k)} style={{
+            padding:"9px 18px",fontSize:13,fontWeight:tab === k ? 700 : 500,
+            cursor:"pointer",background:tab === k ? "#fff" : "transparent",
+            border:"none",borderBottom:"2px solid " + (tab === k ? P.accent : "transparent"),
+            color:tab === k ? P.accent : P.mute,marginBottom:-2
+          }}>{l}</button>
+        ))}
+      </div>
+
+      {tab === "overview" && (
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          {selBU === "전체"
+            ? <SubTable title={"사업부별 현황 (" + titleLabel + " · " + tf + ")"} rows={buRows} labelKey="bu" />
+            : <SubTable title={"사무소별 현황 (" + selBU + " · " + tf + ")"} rows={officeRows} labelKey="of" />
+          }
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+            <div style={{background:"#fff",borderRadius:12,padding:18,
+              border:"1px solid #e2e8f0",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:14}}>
+                월별 가동률 추이 ({titleLabel})
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={trendData} margin={{top:5,right:15,bottom:5,left:-5}}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="month" tick={{fill:P.mute,fontSize:10}} />
+                  <YAxis tick={{fill:P.mute,fontSize:10}} domain={[0,"auto"]} unit="%" />
+                  <Tooltip contentStyle={TT}
+                    itemStyle={{color:"#f1f5f9"}}
+                    labelStyle={{color:"#94a3b8",fontWeight:700}}
+                    formatter={v => v != null ? v.toFixed(1) + "%" : "-"} />
+                  <ReferenceLine y={40} stroke={P.amber} strokeDasharray="4 4" strokeWidth={1} />
+                  <Line type="monotone" dataKey="합계" stroke={P.accent}
+                    strokeWidth={tf === "합계" ? 3 : 0}
+                    dot={tf === "합계" ? {fill:P.accent,r:4} : false}
+                    connectNulls name="합계" />
+                  <Line type="monotone" dataKey="기존형" stroke={P.cyan}
+                    strokeWidth={tf === "기존형" ? 3 : (tf === "합계" ? 1.5 : 0)}
+                    strokeDasharray={tf === "합계" ? "5 3" : undefined}
+                    dot={tf === "기존형" ? {fill:P.cyan,r:4} : false}
+                    connectNulls name="기존형" />
+                  <Line type="monotone" dataKey="튜닝형" stroke={P.purple}
+                    strokeWidth={tf === "튜닝형" ? 3 : (tf === "합계" ? 1.5 : 0)}
+                    strokeDasharray={tf === "합계" ? "5 3" : undefined}
+                    dot={tf === "튜닝형" ? {fill:P.purple,r:4} : false}
+                    connectNulls name="튜닝형" />
+                  <Legend wrapperStyle={{fontSize:11}} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div style={{background:"#fff",borderRadius:12,padding:18,
+              border:"1px solid #e2e8f0",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:14}}>
+                3월 등급 분포 ({filtered.filter(x => x.r[7] != null).length}개 처)
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <ResponsiveContainer width="45%" height={200}>
+                  <PieChart>
+                    <Pie data={gradeDist} dataKey="value" nameKey="name"
+                      cx="50%" cy="50%" innerRadius={42} outerRadius={72} paddingAngle={3}>
+                      {gradeDist.map((d, i) => <Cell key={i} fill={GC[d.name]} />)}
+                    </Pie>
+                    <Tooltip contentStyle={TT} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{flex:1}}>
+                  {["S","A","B+","B","C"].map(g => {
+                    const d = gradeDist.find(x => x.name === g);
+                    const total = gradeDist.reduce((a, b) => a + b.value, 0);
+                    const pct = d && total ? (d.value / total * 100) : 0;
+                    return (
+                      <div key={g} style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
+                        <span style={{width:26,fontSize:11,fontWeight:800,color:GC[g]}}>{g}</span>
+                        <div style={{flex:1,height:12,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
+                          <div style={{width:pct + "%",height:"100%",background:GC[g],borderRadius:3}} />
+                        </div>
+                        <span style={{width:28,fontSize:11,fontWeight:700,color:P.dim,textAlign:"right"}}>
+                          {d ? d.value : 0}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {selBU === "전체" && (
+              <div style={{background:"#fff",borderRadius:12,padding:18,
+                border:"1px solid #e2e8f0",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+                <div style={{fontSize:13,fontWeight:700,marginBottom:14}}>사업부별 2월 vs 3월</div>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={buCmp} margin={{top:10,right:15,bottom:5,left:-5}}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="bu" tick={{fill:P.dim,fontSize:11}} />
+                    <YAxis tick={{fill:P.mute,fontSize:10}} domain={[0,"auto"]} unit="%" />
+                    <Tooltip contentStyle={TT} itemStyle={{color:"#f1f5f9"}}
+                      labelStyle={{color:"#94a3b8",fontWeight:700}}
+                      formatter={v => (v != null ? v.toFixed(1) : 0) + "%"} />
+                    <Bar dataKey="feb" name="2월" fill="#cbd5e1" radius={[4,4,0,0]} barSize={22} />
+                    <Bar dataKey="mar" name="3월" radius={[4,4,0,0]} barSize={22}>
+                      {buCmp.map((d, i) => (
+                        <Cell key={i} fill={d.delta >= 0 ? P.green : P.red} />
+                      ))}
+                    </Bar>
+                    <Legend wrapperStyle={{fontSize:11}} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            <div style={{background:"#fff",borderRadius:12,padding:18,
+              border:"1px solid #e2e8f0",boxShadow:"0 1px 3px rgba(0,0,0,.04)",
+              gridColumn: selBU !== "전체" ? "1 / -1" : undefined}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:P.green}}>
+                    ▲ Top 10 (3월)
+                  </div>
+                  {topBot.top.map((x, i) => (
+                    <RankItem key={i} x={x} i={i} isTop={true} />
+                  ))}
+                </div>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:P.red}}>
+                    ▼ Bottom 10 (3월)
+                  </div>
+                  {topBot.bottom.map((x, i) => (
+                    <RankItem key={i} x={x} i={i} isTop={false} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "trend" && (
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <div style={{background:"#fff",borderRadius:12,padding:20,
+            border:"1px solid #e2e8f0",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+            <div style={{fontSize:14,fontWeight:700,marginBottom:18}}>
+              월별 가동률 추이 ({titleLabel})
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={trendData} margin={{top:10,right:25,bottom:10,left:0}}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="month" tick={{fill:P.dim,fontSize:11}} />
+                <YAxis tick={{fill:P.mute,fontSize:10}} domain={[0,"auto"]} unit="%" />
+                <Tooltip contentStyle={TT} itemStyle={{color:"#f1f5f9"}}
+                  labelStyle={{color:"#94a3b8",fontWeight:700}}
+                  formatter={v => v != null ? v.toFixed(1) + "%" : "-"} />
+                <ReferenceLine y={70} stroke="#2563eb" strokeDasharray="3 3" strokeWidth={0.5} />
+                <ReferenceLine y={60} stroke="#3b82f6" strokeDasharray="3 3" strokeWidth={0.5} />
+                <ReferenceLine y={50} stroke="#94a3b8" strokeDasharray="3 3" strokeWidth={0.5} />
+                <ReferenceLine y={40} stroke="#cbd5e1" strokeDasharray="3 3" strokeWidth={0.5} />
+                <Line type="monotone" dataKey="합계" stroke={P.accent} strokeWidth={3}
+                  dot={{fill:P.accent,r:5}} connectNulls name="합계" />
+                <Line type="monotone" dataKey="기존형" stroke={P.cyan} strokeWidth={2}
+                  dot={{fill:P.cyan,r:3}} connectNulls name="기존형" />
+                <Line type="monotone" dataKey="튜닝형" stroke={P.purple} strokeWidth={2}
+                  dot={{fill:P.purple,r:3}} connectNulls name="튜닝형" />
+                <Legend wrapperStyle={{fontSize:11}} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div style={{background:"#fff",borderRadius:12,padding:20,
+            border:"1px solid #e2e8f0",overflowX:"auto",
+            boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+            <div style={{fontSize:14,fontWeight:700,marginBottom:14}}>
+              사업부별 월별 가동률 (기존+튜닝)
+            </div>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+              <thead>
+                <tr style={{background:"#f8fafc"}}>
+                  <th style={{padding:"7px 12px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:10}}>사업부</th>
+                  <th style={{padding:"7px 6px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>처수</th>
+                  <th style={{padding:"7px 6px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>병상</th>
+                  {MS.map(m => (
+                    <th key={m} style={{padding:"7px 5px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:9}}>{m}</th>
+                  ))}
+                  <th style={{padding:"7px 6px",textAlign:"center",color:P.amber,fontWeight:700,fontSize:10}}>누적</th>
+                </tr>
+              </thead>
+              <tbody>
+                {SUM.filter(s => s.type === "합계").map((s, i) => (
+                  <tr key={i} style={{borderBottom:"1px solid #f1f5f9",
+                    background:s.bu === "전체" ? "#f8fafc" : "transparent"}}>
+                    <td style={{padding:"7px 12px",fontWeight:s.bu === "전체" ? 700 : 500}}>{s.bu}</td>
+                    <td style={{padding:"7px 6px",textAlign:"center",color:P.dim,fontSize:10}}>{s.ct}</td>
+                    <td style={{padding:"7px 6px",textAlign:"center",color:P.dim,fontSize:10}}>{s.tb.toLocaleString()}</td>
+                    {s.m.map((v, j) => <RateCell key={j} v={v} />)}
+                    <td style={{padding:"7px 6px",textAlign:"center",fontWeight:700,color:P.amber,fontSize:11}}>
+                      {s.ca.toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab === "hospitals" && (
+        <div style={{background:"#fff",borderRadius:12,padding:18,
+          border:"1px solid #e2e8f0",overflowX:"auto",
+          boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+          <div style={{fontSize:14,fontWeight:700,marginBottom:14}}>
+            거래처별 상세
+            <span style={{fontSize:12,color:P.mute,fontWeight:400,marginLeft:8}}>
+              ({sorted.length}개 · {titleLabel} · {tf})
+            </span>
+          </div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead>
+              <tr style={{background:"#f8fafc"}}>
+                <th style={{padding:"7px 6px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:9}}>#</th>
+                <th style={{padding:"7px 6px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:9}}>유형</th>
+                <th style={{padding:"7px 6px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:9}}>사업부</th>
+                <th style={{padding:"7px 6px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:9}}>사무소</th>
+                <th style={{padding:"7px 6px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:9}}>담당자</th>
+                <th style={{padding:"7px 6px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:9,minWidth:100}}>병원명</th>
+                <th style={{padding:"7px 6px",textAlign:"right",color:P.mute,fontWeight:600,fontSize:9}}>병상</th>
+                {MS.map(m => (
+                  <th key={m} style={{padding:"7px 3px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:8,minWidth:44}}>{m}</th>
+                ))}
+                <th style={{padding:"7px 5px",textAlign:"center",color:P.amber,fontWeight:700,fontSize:9}}>누적</th>
+                <th style={{padding:"7px 5px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:9}}>등급</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((x, i) => (
+                <tr key={i} style={{borderBottom:"1px solid #f1f5f9",
+                  background:i % 2 === 0 ? "transparent" : "#fafbfc"}}>
+                  <td style={{padding:"5px 6px",textAlign:"center",color:P.mute,fontSize:9}}>{i + 1}</td>
+                  <td style={{padding:"5px 6px"}}>
+                    <span style={{fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:3,
+                      color:x.t === "기존" ? P.cyan : P.purple,
+                      background:x.t === "기존" ? "#ecfeff" : "#f5f3ff"}}>{x.t}</span>
+                  </td>
+                  <td style={{padding:"5px 6px",fontSize:10,color:P.dim}}>{x.bu}</td>
+                  <td style={{padding:"5px 6px",fontSize:10,color:P.dim}}>{x.of}</td>
+                  <td style={{padding:"5px 6px",fontSize:10,color:P.dim}}>{x.rp}</td>
+                  <td style={{padding:"5px 6px",fontSize:11,fontWeight:500,maxWidth:140,
+                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.h}</td>
+                  <td style={{padding:"5px 6px",textAlign:"right",color:P.dim,fontSize:10}}>{x.b}</td>
+                  {x.r.map((v, j) => <RateCell key={j} v={v} />)}
+                  <td style={{padding:"5px 5px",textAlign:"center",fontWeight:700,color:P.amber,fontSize:11}}>
+                    {x.ca != null ? x.ca.toFixed(1) + "%" : "-"}
+                  </td>
+                  <td style={{padding:"5px 5px",textAlign:"center"}}>
+                    <Badge grade={getGrade(x.ca)} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div style={{marginTop:20,padding:"12px 0",borderTop:"1px solid #e2e8f0",
+        display:"flex",justifyContent:"space-between"}}>
+        <div style={{fontSize:10,color:P.mute}}>대웅제약 디지털헬스2팀 · thynC 사용량 비례형 병상가동률</div>
+        <div style={{fontSize:10,color:P.mute}}>데이터 기준일: 2026.03.30</div>
+      </div>
+    </div>
+  );
 }
-function setDiv(d){
-  currentDiv=d;currentOffice='전체';
-  render();
-}
-function setOffice(o){
-  currentOffice=o;
-  render();
-}
-function setContent(c){
-  currentContent=c;
-  document.querySelectorAll('.ctab').forEach(function(b){b.classList.remove('active');});
-  var tabs={'dashboard':0,'heatmap':1,'table':2};
-  document.querySelectorAll('.ctab')[tabs[c]].classList.add('active');
-  document.getElementById('panel-dashboard').style.display=c==='dashboard'?'':'none';
-  document.getElementById('panel-heatmap').style.display=c==='heatmap'?'':'none';
-  document.getElementById('panel-table').style.display=c==='table'?'':'none';
-  if(c==='heatmap')renderHeatmap();
-  if(c==='table')renderTable();
-}
-function render(){
-  renderBreadcrumb();
-  renderDivNav();
-  renderOfficeNav();
-  renderKPIs();
-  renderBarChart();
-  renderAvgChart();
-  renderTop5();
-  renderOfficeStrip();
-  if(currentContent==='heatmap')renderHeatmap();
-  if(currentContent==='table')renderTable();
-  var hospitals=getHospitals();
-  document.getElementById('footerMeta').textContent='총 '+hospitals.length+'개 병원 · '+new Date().toLocaleDateString('ko-KR');
-}
-render();
-</script>
-</body>
-</html>
