@@ -1,84 +1,259 @@
-import { useState, useMemo } from "react";
-import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis,
-  Tooltip, ResponsiveContainer, CartesianGrid,
-  PieChart, Pie, Cell, Legend, ReferenceLine
-} from "recharts";
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>사용량 비례형 현황 대시보드 _ 병원본부</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --accent:#2563eb; --green:#16a34a; --red:#dc2626;
+    --amber:#d97706; --purple:#7c3aed; --cyan:#0891b2;
+    --text:#0f172a; --dim:#475569; --mute:#94a3b8;
+    --border:#e2e8f0; --blight:#f1f5f9;
+    --bg:#f8fafc;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html { -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  body { background:var(--bg); color:var(--text); font-family:'Pretendard',system-ui,-apple-system,sans-serif; padding:20px 24px; min-height:100vh; overflow-x:hidden; }
 
+  .header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:20px; }
+  .header-label { font-size:10px; font-weight:700; color:var(--accent); letter-spacing:2px; text-transform:uppercase; margin-bottom:2px; }
+  .header h1 { font-size:22px; font-weight:800; margin:0; }
+  .header-sub { font-size:11px; color:var(--mute); margin-top:2px; }
+
+  .type-filters { display:flex; gap:6px; }
+  .type-btn { padding:6px 14px; border-radius:8px; font-size:12px; cursor:pointer; border:1.5px solid var(--border); background:#fff; color:var(--mute); font-weight:500; transition:all .15s; }
+  .type-btn.active-total { background:#eff6ff; color:var(--accent); border-color:var(--accent); font-weight:700; }
+  .type-btn.active-legacy { background:#ecfeff; color:var(--cyan); border-color:var(--cyan); font-weight:700; }
+  .type-btn.active-tuning { background:#f5f3ff; color:var(--purple); border-color:var(--purple); font-weight:700; }
+
+  .bu-nav { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; align-items:center; }
+  .bu-label { font-size:10px; color:var(--mute); font-weight:700; }
+  .bu-btn { padding:5px 12px; border-radius:7px; font-size:12px; cursor:pointer; border:1px solid var(--border); background:#fff; color:var(--dim); font-weight:500; transition:all .15s; }
+  .bu-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:700; }
+
+  .of-nav { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:16px; align-items:center; }
+  .of-nav:empty { margin-bottom:0; }
+  .of-label { font-size:10px; color:var(--mute); font-weight:700; }
+  .of-btn { padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer; border:1px solid var(--border); background:#fff; color:var(--dim); font-weight:500; transition:all .15s; }
+  .of-btn.active { background:#0891b2; color:#fff; border-color:#0891b2; font-weight:700; }
+
+  .kpi-row { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+  .kpi { background:#fff; border-radius:12px; padding:16px 20px; border:1px solid var(--border); flex:1; min-width:155px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+  .kpi-label { font-size:10px; font-weight:700; color:var(--mute); text-transform:uppercase; letter-spacing:1.2px; margin-bottom:6px; }
+  .kpi-value { font-size:28px; font-weight:800; line-height:1.1; }
+  .kpi-sub { font-size:11px; color:var(--dim); margin-top:4px; }
+  .kpi-delta { font-size:11px; font-weight:700; margin-top:4px; }
+  .kpi-delta.up { color:var(--green); }
+  .kpi-delta.down { color:var(--red); }
+
+  .tabs { display:flex; gap:2px; margin-bottom:18px; border-bottom:2px solid var(--border); }
+  .tab-btn { padding:9px 18px; font-size:13px; cursor:pointer; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--mute); font-weight:500; margin-bottom:-2px; transition:all .15s; }
+  .tab-btn.active { background:#fff; border-bottom-color:var(--accent); color:var(--accent); font-weight:700; }
+
+  .card { background:#fff; border-radius:12px; padding:18px; border:1px solid var(--border); box-shadow:0 1px 3px rgba(0,0,0,.04); overflow-x:auto; }
+  .card-title { font-size:14px; font-weight:700; margin-bottom:14px; }
+  .card-title-sm { font-size:13px; font-weight:700; margin-bottom:14px; }
+
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  th { padding:8px 8px; text-align:center; color:var(--mute); font-weight:600; font-size:10px; background:#f8fafc; }
+  th.left { text-align:left; padding-left:14px; }
+  td { padding:7px 8px; text-align:center; }
+  tr.row-border { border-bottom:1px solid var(--blight); }
+  tr.alt { background:#fafbfc; }
+  tr.total-row { background:#f8fafc; }
+  .td-left { text-align:left; padding-left:14px; }
+
+  .badge { display:inline-block; padding:2px 7px; border-radius:5px; font-size:10px; font-weight:800; }
+  .badge-S { color:#2563eb; background:#dbeafe; }
+  .badge-A { color:#3b82f6; background:#eff6ff; }
+  .badge-Bp { color:#334155; background:#f1f5f9; }
+  .badge-B { color:#475569; background:#f8fafc; }
+  .badge-C { color:#dc2626; background:#fef2f2; }
+
+  .rate-S { color:#2563eb; background:#dbeafe; font-weight:700; border-radius:3px; }
+  .rate-A { color:#3b82f6; background:#eff6ff; font-weight:700; border-radius:3px; }
+  .rate-Bp { color:#334155; background:#f1f5f9; font-weight:700; border-radius:3px; }
+  .rate-B { color:#475569; background:#f8fafc; font-weight:700; border-radius:3px; }
+  .rate-C { color:#dc2626; background:#fef2f2; font-weight:700; border-radius:3px; }
+
+  .tag { font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; }
+  .tag-legacy { color:var(--cyan); background:#ecfeff; }
+  .tag-tuning { color:var(--purple); background:#f5f3ff; }
+
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .grid-span { grid-column:1 / -1; }
+  .flex-col { display:flex; flex-direction:column; gap:16px; }
+
+  .rank-item { display:flex; align-items:center; gap:6px; margin-bottom:5px; padding:3px 0; }
+  .rank-num { width:18px; height:18px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:800; flex-shrink:0; }
+  .rank-name { flex:1; font-size:11px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rank-bu { font-size:9px; color:var(--mute); flex-shrink:0; }
+  .rank-val { font-size:11px; font-weight:800; width:48px; text-align:right; flex-shrink:0; }
+
+  .grade-row { display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+  .grade-label { width:26px; font-size:11px; font-weight:800; }
+  .grade-bar-bg { flex:1; height:12px; background:var(--blight); border-radius:3px; overflow:hidden; }
+  .grade-bar-fill { height:100%; border-radius:3px; transition:width .3s; }
+  .grade-count { width:28px; font-size:11px; font-weight:700; color:var(--dim); text-align:right; }
+
+  .footer { margin-top:20px; padding:12px 0; border-top:1px solid var(--border); display:flex; justify-content:space-between; }
+  .footer span { font-size:10px; color:var(--mute); }
+
+  .chart-container { position:relative; width:100%; }
+  .hidden { display:none !important; }
+
+  /* ─── Responsive: Tablet ─── */
+  @media (max-width:1024px) {
+    .grid-2 { grid-template-columns:1fr 1fr; gap:12px; }
+  }
+
+  /* ─── Responsive: Mobile ─── */
+  @media (max-width:768px) {
+    body { padding:14px 12px; }
+
+    .header { flex-direction:column; gap:10px; margin-bottom:14px; }
+    .header h1 { font-size:17px; line-height:1.3; }
+    .header-sub { font-size:10px; line-height:1.5; }
+
+    .type-filters { width:100%; }
+    .type-btn { flex:1; padding:7px 6px; font-size:11px; text-align:center; }
+
+    .bu-nav { gap:5px; margin-bottom:10px; }
+    .bu-label, .of-label { width:100%; margin-bottom:2px; }
+    .bu-btn { padding:6px 10px; font-size:11px; flex:1; text-align:center; min-width:0; }
+    .of-nav { gap:4px; margin-bottom:10px; }
+    .of-btn { padding:5px 8px; font-size:10px; }
+
+    .kpi-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+    .kpi { min-width:0; padding:12px 14px; border-radius:10px; }
+    .kpi-label { font-size:9px; letter-spacing:0.8px; margin-bottom:4px; }
+    .kpi-value { font-size:22px; }
+    .kpi-sub { font-size:10px; }
+    .kpi-delta { font-size:10px; }
+
+    .tabs { gap:0; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .tab-btn { padding:8px 12px; font-size:12px; white-space:nowrap; flex-shrink:0; }
+
+    .grid-2 { grid-template-columns:1fr; gap:12px; }
+
+    .card { padding:14px; border-radius:10px; }
+    .card-title { font-size:13px; margin-bottom:10px; }
+    .card-title-sm { font-size:12px; margin-bottom:10px; }
+
+    table { font-size:10px; }
+    th { padding:6px 4px; font-size:8px; }
+    td { padding:5px 4px; font-size:9px; }
+    th.left, .td-left { padding-left:8px; }
+
+    .rank-item { gap:4px; margin-bottom:4px; }
+    .rank-name { font-size:10px; }
+    .rank-bu { font-size:8px; }
+    .rank-val { font-size:10px; width:42px; }
+    .rank-num { width:16px; height:16px; font-size:8px; }
+
+    .badge { padding:1px 5px; font-size:9px; }
+    .tag { font-size:8px; padding:1px 4px; }
+
+    .grade-row { gap:6px; margin-bottom:5px; }
+    .grade-label { font-size:10px; width:22px; }
+    .grade-bar-bg { height:10px; }
+    .grade-count { font-size:10px; }
+
+    .footer { flex-direction:column; gap:4px; align-items:center; text-align:center; }
+    .footer span { font-size:9px; }
+
+    /* Top/Bottom ranking split to single column on very small */
+    .rank-grid-mobile { grid-template-columns:1fr !important; }
+  }
+
+  /* ─── Responsive: Small phone ─── */
+  @media (max-width:400px) {
+    body { padding:10px 8px; }
+    .header h1 { font-size:15px; }
+    .kpi-row { grid-template-columns:1fr 1fr; gap:6px; }
+    .kpi { padding:10px 10px; }
+    .kpi-value { font-size:18px; }
+    .kpi-label { font-size:8px; }
+    .bu-btn { padding:5px 6px; font-size:10px; }
+    .type-btn { padding:6px 4px; font-size:10px; }
+    .tab-btn { padding:7px 8px; font-size:11px; }
+  }
+
+  /* Touch-friendly tap targets */
+  @media (pointer:coarse) {
+    .bu-btn, .of-btn, .type-btn, .tab-btn { min-height:36px; display:inline-flex; align-items:center; justify-content:center; }
+  }
+
+  /* Safe area for notched phones */
+  @supports (padding: env(safe-area-inset-bottom)) {
+    body { padding-bottom:calc(20px + env(safe-area-inset-bottom)); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <h1>사용량 비례형 현황 대시보드 _ 병원본부</h1>
+      <div class="header-sub">사용량 비례형만 포함됨 · 26년 3월 기준 · S≥70% · A≥60% · B+≥50% · B≥40% · C&lt;40%</div>
+    </div>
+    <div class="type-filters" id="typeFilters"></div>
+  </div>
+
+  <!-- BU Nav -->
+  <div class="bu-nav" id="buNav"></div>
+  <div class="of-nav" id="ofNav"></div>
+
+  <!-- KPI Row -->
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabs"></div>
+
+  <!-- Tab Content -->
+  <div id="tabContent"></div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>대웅제약 디지털헬스2팀 · thynC 사용량 비례형 병상가동률</span>
+    <span>데이터 기준: 26년 3월</span>
+  </div>
+</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────
 const MS = ["25.8","25.9","25.10","25.11","25.12","26.1","26.2","26.3"];
 const GC = {S:"#2563eb",A:"#3b82f6","B+":"#334155",B:"#475569",C:"#dc2626"};
 const GBG = {S:"#dbeafe",A:"#eff6ff","B+":"#f1f5f9",B:"#f8fafc",C:"#fef2f2"};
-const P = {
-  accent:"#2563eb",green:"#16a34a",red:"#dc2626",
-  amber:"#d97706",purple:"#7c3aed",cyan:"#0891b2",
-  text:"#0f172a",dim:"#475569",mute:"#94a3b8",
-  border:"#e2e8f0",blight:"#f1f5f9"
-};
-const TT = {
-  background:"#0f172a",border:"1px solid #334155",
-  borderRadius:10,fontSize:12,color:"#f1f5f9",
-  boxShadow:"0 8px 30px rgba(0,0,0,.25)"
-};
 
-function getGrade(v) {
-  if (v == null) return null;
-  if (v >= 70) return "S";
-  if (v >= 60) return "A";
-  if (v >= 50) return "B+";
-  if (v >= 40) return "B";
-  return "C";
-}
+function getGrade(v){ if(v==null)return null; if(v>=70)return"S"; if(v>=60)return"A"; if(v>=50)return"B+"; if(v>=40)return"B"; return"C"; }
 
-function calcAgg(list) {
-  const withMar = list.filter(x => x.r[7] != null);
-  const mar = withMar.length
-    ? withMar.reduce((a, x) => a + x.r[7], 0) / withMar.length
-    : null;
-  const withFeb = list.filter(x => x.r[6] != null);
-  const feb = withFeb.length
-    ? withFeb.reduce((a, x) => a + x.r[6], 0) / withFeb.length
-    : null;
-  return {
-    count: list.length,
-    beds: list.reduce((a, x) => a + x.b, 0),
-    active: withMar.length,
-    mar: mar,
-    feb: feb,
-    delta: (mar != null && feb != null) ? mar - feb : null
-  };
+function calcAgg(list){
+  const wM=list.filter(x=>x.r[7]!=null), wF=list.filter(x=>x.r[6]!=null);
+  const mar=wM.length?wM.reduce((a,x)=>a+x.r[7],0)/wM.length:null;
+  const feb=wF.length?wF.reduce((a,x)=>a+x.r[6],0)/wF.length:null;
+  return{count:list.length,beds:list.reduce((a,x)=>a+x.b,0),active:wM.length,mar,feb,delta:(mar!=null&&feb!=null)?mar-feb:null};
 }
 
 const SUM = [
-  {bu:"전체",type:"기존형",ct:63,tb:8356,ac:55,ab:7462,ca:27.75,
-   m:[14.18,29.09,25.64,33.32,29.27,32.50,35.37,29.49]},
-  {bu:"전체",type:"튜닝형",ct:70,tb:6484,ac:35,ab:3516,ca:20.07,
-   m:[20.04,26.89,37.68,27.71,15.40,20.33,22.74,23.59]},
-  {bu:"전체",type:"합계",ct:133,tb:14840,ac:90,ab:10978,ca:24.91,
-   m:[16.13,28.65,27.36,32.76,27.08,29.36,31.66,27.39]},
-  {bu:"서울1",type:"기존형",ct:12,tb:1830,ac:9,ab:1578,ca:19.84,
-   m:[null,41.70,35.53,24.64,19.32,19.92,27.82,18.53]},
-  {bu:"서울1",type:"튜닝형",ct:14,tb:907,ac:7,ab:472,ca:25.54,
-   m:[null,32.05,50.57,33.30,20.51,26.86,22.91,28.15]},
-  {bu:"서울1",type:"합계",ct:26,tb:2737,ac:16,ab:2050,ca:22.33,
-   m:[null,36.88,43.05,27.52,19.83,22.23,25.77,22.74]},
-  {bu:"서울2",type:"기존형",ct:20,tb:2725,ac:18,ab:2353,ca:27.97,
-   m:[null,63.55,22.56,26.94,28.33,31.38,32.63,29.43]},
-  {bu:"서울2",type:"튜닝형",ct:11,tb:1468,ac:8,ab:947,ca:21.53,
-   m:[20.04,21.74,24.78,22.13,20.85,30.09,28.67,24.92]},
-  {bu:"서울2",type:"합계",ct:31,tb:4193,ac:26,ab:3300,ca:25.99,
-   m:[20.04,42.64,23.12,26.14,27.80,31.18,31.84,28.04]},
-  {bu:"지방1",type:"기존형",ct:13,tb:1319,ac:12,ab:1249,ca:39.86,
-   m:[18.97,14.60,25.96,37.38,39.37,47.79,47.21,43.51]},
-  {bu:"지방1",type:"튜닝형",ct:24,tb:2366,ac:12,ab:1306,ca:13.19,
-   m:[null,null,null,null,0.80,11.02,15.12,15.82]},
-  {bu:"지방1",type:"합계",ct:37,tb:3685,ac:24,ab:2555,ca:26.53,
-   m:[18.97,14.60,25.96,37.38,35.08,35.53,36.51,29.67]},
-  {bu:"지방2",type:"기존형",ct:18,tb:2482,ac:16,ab:2282,ca:22.87,
-   m:[9.39,27.89,25.32,38.54,25.16,27.10,31.59,25.22]},
-  {bu:"지방2",type:"튜닝형",ct:17,tb:1574,ac:8,ab:791,ca:25.76,
-   m:[null,null,null,null,9.22,19.76,28.43,32.06]},
-  {bu:"지방2",type:"합계",ct:35,tb:4056,ac:24,ab:3073,ca:23.83,
-   m:[9.39,27.89,25.32,38.54,23.17,25.15,30.54,27.50]},
+  {bu:"전체",type:"기존형",ct:63,tb:8356,ac:55,ab:7462,ca:27.75,m:[14.18,29.09,25.64,33.32,29.27,32.50,35.37,29.49]},
+  {bu:"전체",type:"튜닝형",ct:70,tb:6484,ac:35,ab:3516,ca:20.07,m:[20.04,26.89,37.68,27.71,15.40,20.33,22.74,23.59]},
+  {bu:"전체",type:"합계",ct:133,tb:14840,ac:90,ab:10978,ca:24.91,m:[16.13,28.65,27.36,32.76,27.08,29.36,31.66,27.39]},
+  {bu:"서울1",type:"기존형",ct:12,tb:1830,ac:9,ab:1578,ca:19.84,m:[null,41.70,35.53,24.64,19.32,19.92,27.82,18.53]},
+  {bu:"서울1",type:"튜닝형",ct:14,tb:907,ac:7,ab:472,ca:25.54,m:[null,32.05,50.57,33.30,20.51,26.86,22.91,28.15]},
+  {bu:"서울1",type:"합계",ct:26,tb:2737,ac:16,ab:2050,ca:22.33,m:[null,36.88,43.05,27.52,19.83,22.23,25.77,22.74]},
+  {bu:"서울2",type:"기존형",ct:20,tb:2725,ac:18,ab:2353,ca:27.97,m:[null,63.55,22.56,26.94,28.33,31.38,32.63,29.43]},
+  {bu:"서울2",type:"튜닝형",ct:11,tb:1468,ac:8,ab:947,ca:21.53,m:[20.04,21.74,24.78,22.13,20.85,30.09,28.67,24.92]},
+  {bu:"서울2",type:"합계",ct:31,tb:4193,ac:26,ab:3300,ca:25.99,m:[20.04,42.64,23.12,26.14,27.80,31.18,31.84,28.04]},
+  {bu:"지방1",type:"기존형",ct:13,tb:1319,ac:12,ab:1249,ca:39.86,m:[18.97,14.60,25.96,37.38,39.37,47.79,47.21,43.51]},
+  {bu:"지방1",type:"튜닝형",ct:24,tb:2366,ac:12,ab:1306,ca:13.19,m:[null,null,null,null,0.80,11.02,15.12,15.82]},
+  {bu:"지방1",type:"합계",ct:37,tb:3685,ac:24,ab:2555,ca:26.53,m:[18.97,14.60,25.96,37.38,35.08,35.53,36.51,29.67]},
+  {bu:"지방2",type:"기존형",ct:18,tb:2482,ac:16,ab:2282,ca:22.87,m:[9.39,27.89,25.32,38.54,25.16,27.10,31.59,25.22]},
+  {bu:"지방2",type:"튜닝형",ct:17,tb:1574,ac:8,ab:791,ca:25.76,m:[null,null,null,null,9.22,19.76,28.43,32.06]},
+  {bu:"지방2",type:"합계",ct:35,tb:4056,ac:24,ab:3073,ca:23.83,m:[9.39,27.89,25.32,38.54,23.17,25.15,30.54,27.50]},
 ];
 
 const HOSP = [
@@ -174,546 +349,517 @@ const HOSP = [
 {t:"튜닝",bu:"지방2",of:"병원청주",rp:"이헌찬",h:"뿌리병원",b:49,r:[null,null,null,null,null,12.99,51.85,42.78],ca:35.87},
 ];
 
-function Kpi({label, value, sub, delta, color}) {
-  return (
-    <div style={{background:"#fff",borderRadius:12,padding:"16px 20px",
-      border:"1px solid #e2e8f0",flex:1,minWidth:155,
-      boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-      <div style={{fontSize:10,fontWeight:700,color:P.mute,
-        textTransform:"uppercase",letterSpacing:1.2,marginBottom:6}}>
-        {label}
-      </div>
-      <div style={{fontSize:28,fontWeight:800,color:color||P.text,lineHeight:1.1}}>
-        {value}
-      </div>
-      {sub ? <div style={{fontSize:11,color:P.dim,marginTop:4}}>{sub}</div> : null}
-      {delta != null ? (
-        <div style={{fontSize:11,fontWeight:700,
-          color:delta >= 0 ? P.green : P.red,marginTop:4}}>
-          {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}%p vs 2월
-        </div>
-      ) : null}
-    </div>
-  );
+// ─── STATE ──────────────────────────────────────────
+let selBU = "전체", selOF = "전체", tf = "합계", tab = "overview";
+let charts = {};
+
+// ─── HELPERS ────────────────────────────────────────
+function gradeClass(g){ return g ? ('badge-'+(g==='B+'?'Bp':g)) : ''; }
+function rateClass(g){ return g ? ('rate-'+(g==='B+'?'Bp':g)) : ''; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function rateCell(v){
+  if(v==null) return `<td style="padding:4px 5px;text-align:center;color:var(--mute);font-size:10px">-</td>`;
+  const g=getGrade(v);
+  return `<td class="${rateClass(g)}" style="padding:4px 5px;text-align:center;font-size:10px">${v.toFixed(1)}</td>`;
 }
 
-function Badge({grade}) {
-  if (!grade) return <span style={{color:P.mute,fontSize:10}}>-</span>;
-  return (
-    <span style={{display:"inline-block",padding:"2px 7px",borderRadius:5,
-      fontSize:10,fontWeight:800,color:GC[grade],background:GBG[grade]}}>
-      {grade}
-    </span>
-  );
+function badgeHtml(g){
+  if(!g) return `<span style="color:var(--mute);font-size:10px">-</span>`;
+  return `<span class="badge ${gradeClass(g)}">${g}</span>`;
 }
 
-function RateCell({v}) {
-  if (v == null) {
-    return <td style={{padding:"4px 5px",textAlign:"center",color:P.mute,fontSize:10}}>-</td>;
+function getFiltered(){
+  let l = HOSP;
+  if(selBU!=="전체") l=l.filter(x=>x.bu===selBU);
+  if(selOF!=="전체") l=l.filter(x=>x.of===selOF);
+  if(tf==="기존형") l=l.filter(x=>x.t==="기존");
+  else if(tf==="튜닝형") l=l.filter(x=>x.t==="튜닝");
+  return l;
+}
+
+function destroyCharts(){ Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}}); charts={}; }
+
+// ─── RENDER FUNCTIONS ───────────────────────────────
+function renderTypeFilters(){
+  const el=document.getElementById('typeFilters');
+  const types=[{k:"합계",label:"기존+튜닝"},{k:"기존형",label:"기존형"},{k:"튜닝형",label:"튜닝형"}];
+  el.innerHTML=types.map(t=>{
+    const cls = tf===t.k ? (t.k==="기존형"?"active-legacy":t.k==="튜닝형"?"active-tuning":"active-total") : "";
+    return `<button class="type-btn ${cls}" data-tf="${t.k}">${t.label}</button>`;
+  }).join('');
+  el.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ tf=b.dataset.tf; render(); }));
+}
+
+function renderBuNav(){
+  const el=document.getElementById('buNav');
+  const bus=["전체","서울1","서울2","지방1","지방2"];
+  el.innerHTML=`<span class="bu-label">사업부</span>`+bus.map(b=>
+    `<button class="bu-btn ${selBU===b?'active':''}" data-bu="${b}">${b}</button>`
+  ).join('');
+  el.querySelectorAll('.bu-btn').forEach(b=>b.addEventListener('click',()=>{ selBU=b.dataset.bu; selOF="전체"; render(); }));
+}
+
+function renderOfNav(){
+  const el=document.getElementById('ofNav');
+  if(selBU==="전체"){ el.innerHTML=''; return; }
+  const offices=[...new Set(HOSP.filter(x=>x.bu===selBU).map(x=>x.of))].sort();
+  el.innerHTML=`<span class="of-label">사무소</span>`
+    +`<button class="of-btn ${selOF==="전체"?'active':''}" data-of="전체">전체</button>`
+    +offices.map(o=>
+      `<button class="of-btn ${selOF===o?'active':''}" data-of="${o}">${o}</button>`
+    ).join('');
+  el.querySelectorAll('.of-btn').forEach(b=>b.addEventListener('click',()=>{ selOF=b.dataset.of; render(); }));
+}
+
+function renderKpis(){
+  const filtered=getFiltered();
+  const a=calcAgg(filtered);
+  const titleLabel=(selBU!=="전체"?selBU:"전체")+(selOF!=="전체"?" > "+selOF:"");
+
+  let contracts, totalBeds, cumAvg;
+  if(selOF!=="전체"){
+    // 사무소 선택 시 필터된 데이터에서 직접 계산
+    contracts=a.count;
+    totalBeds=a.beds;
+    const allWithCa=filtered.filter(x=>x.ca!=null);
+    cumAvg=allWithCa.length?allWithCa.reduce((s,x)=>s+x.ca,0)/allWithCa.length:0;
+  } else {
+    const s=SUM.find(x=>x.bu===(selBU!=="전체"?selBU:"전체")&&x.type===tf)||SUM.find(x=>x.bu==="전체"&&x.type==="합계");
+    contracts=s?s.ct:a.count;
+    totalBeds=s?s.tb:a.beds;
+    cumAvg=s?s.ca:0;
   }
-  const g = getGrade(v);
-  return (
-    <td style={{padding:"4px 5px",textAlign:"center",fontSize:10,
-      fontWeight:700,color:GC[g],background:GBG[g],borderRadius:3}}>
-      {v.toFixed(1)}
-    </td>
-  );
+  const kpi={...a,contracts,totalBeds,cumAvg};
+
+  const marColor = kpi.mar>=40?'var(--green)':kpi.mar>=25?'var(--amber)':'var(--red)';
+  const deltaHtml = kpi.delta!=null
+    ? `<div class="kpi-delta ${kpi.delta>=0?'up':'down'}">${kpi.delta>=0?"▲":"▼"} ${Math.abs(kpi.delta).toFixed(1)}%p vs 2월</div>`
+    : '';
+
+  document.getElementById('kpiRow').innerHTML=`
+    <div class="kpi">
+      <div class="kpi-label">3월 가동률</div>
+      <div class="kpi-value" style="color:${marColor}">${kpi.mar!=null?kpi.mar.toFixed(1)+"%":"-"}</div>
+      ${deltaHtml}
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">계약 처수</div>
+      <div class="kpi-value">${kpi.contracts}</div>
+      <div class="kpi-sub">가동 ${kpi.active}개 처</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">누계 병상수</div>
+      <div class="kpi-value">${kpi.totalBeds.toLocaleString()}</div>
+      <div class="kpi-sub">가동 ${kpi.beds.toLocaleString()} 병상</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">누적 평균</div>
+      <div class="kpi-value" style="color:var(--amber)">${kpi.cumAvg.toFixed(1)}%</div>
+      <div class="kpi-sub">${titleLabel} · ${tf}</div>
+    </div>
+  `;
 }
 
-function SubTable({title, rows, labelKey}) {
-  return (
-    <div style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",
-      overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-      <div style={{padding:"14px 18px 10px",fontSize:13,fontWeight:700,
-        color:P.text,borderBottom:"1px solid #f1f5f9"}}>{title}</div>
-      <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-        <thead>
-          <tr style={{background:"#f8fafc"}}>
-            <th style={{padding:"8px 14px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:10}}>
-              {labelKey === "bu" ? "사업부" : "사무소"}
-            </th>
-            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>처수</th>
-            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>병상</th>
-            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>가동</th>
-            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>3월</th>
-            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>2월</th>
-            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>변동</th>
-            <th style={{padding:"8px 8px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>등급</th>
-          </tr>
-        </thead>
+function renderTabs(){
+  const el=document.getElementById('tabs');
+  const tabs=[["overview","종합 현황"],["trend","월별 추이"],["hospitals","거래처 상세"]];
+  el.innerHTML=tabs.map(([k,l])=>
+    `<button class="tab-btn ${tab===k?'active':''}" data-tab="${k}">${l}</button>`
+  ).join('');
+  el.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',()=>{ tab=b.dataset.tab; renderContent(); renderTabs(); }));
+}
+
+function renderContent(){
+  destroyCharts();
+  const el=document.getElementById('tabContent');
+  if(tab==="overview") renderOverview(el);
+  else if(tab==="trend") renderTrend(el);
+  else renderHospitals(el);
+}
+
+// ─── OVERVIEW TAB ───────────────────────────────────
+function renderOverview(el){
+  const filtered=getFiltered();
+  const titleLabel=(selBU!=="전체"?selBU:"전체")+(selOF!=="전체"?" > "+selOF:"");
+
+  // SubTable data
+  let subTableHtml='';
+  if(selBU==="전체"){
+    const bus=["서울1","서울2","지방1","지방2"];
+    const rows=bus.map(bu=>{
+      let l=HOSP.filter(x=>x.bu===bu);
+      if(tf==="기존형") l=l.filter(x=>x.t==="기존");
+      else if(tf==="튜닝형") l=l.filter(x=>x.t==="튜닝");
+      if(!l.length) return null;
+      return {label:bu,...calcAgg(l)};
+    }).filter(Boolean);
+    subTableHtml=buildSubTable(`사업부별 현황 (${titleLabel} · ${tf})`,rows,"bu");
+  } else if(selOF!=="전체"){
+    // 사무소 선택 시: 해당 사무소 내 병원별 현황
+    const hospRows=filtered.map(x=>{
+      const wM=x.r[7]!=null?[x]:[];
+      const wF=x.r[6]!=null?[x]:[];
+      return {label:x.h,count:1,beds:x.b,active:wM.length,mar:x.r[7],feb:x.r[6],
+        delta:(x.r[7]!=null&&x.r[6]!=null)?x.r[7]-x.r[6]:null};
+    });
+    subTableHtml=buildSubTable(`병원별 현황 (${titleLabel} · ${tf})`,hospRows,"hosp");
+  } else {
+    let l=HOSP.filter(x=>x.bu===selBU);
+    if(tf==="기존형") l=l.filter(x=>x.t==="기존");
+    else if(tf==="튜닝형") l=l.filter(x=>x.t==="튜닝");
+    const offices=[...new Set(l.map(x=>x.of))].sort();
+    const rows=offices.map(of=>({label:of,...calcAgg(l.filter(x=>x.of===of))}));
+    subTableHtml=buildSubTable(`사무소별 현황 (${selBU} · ${tf})`,rows,"of");
+  }
+
+  // Grade dist
+  const gCounts={S:0,A:0,"B+":0,B:0,C:0};
+  filtered.forEach(x=>{ const g=getGrade(x.r[7]); if(g) gCounts[g]++; });
+  const totalG=Object.values(gCounts).reduce((a,b)=>a+b,0);
+
+  // Top/Bottom
+  const withMar=filtered.filter(x=>x.r[7]!=null).sort((a,b)=>b.r[7]-a.r[7]);
+  const top10=withMar.slice(0,10), bot10=withMar.slice(-10).reverse();
+
+  // BU comparison
+  let buCmpHtml='';
+  if(selBU==="전체"){
+    buCmpHtml=`<div class="card"><div class="card-title-sm">사업부별 2월 vs 3월</div><div class="chart-container"><canvas id="chartBuCmp" height="220"></canvas></div></div>`;
+  }
+
+  el.innerHTML=`
+    <div class="flex-col">
+      ${subTableHtml}
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title-sm">월별 가동률 추이 (${titleLabel})</div>
+          <div class="chart-container"><canvas id="chartTrendMini" height="220"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title-sm">3월 등급 분포 (${filtered.filter(x=>x.r[7]!=null).length}개 처)</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:45%"><canvas id="chartPie" height="200"></canvas></div>
+            <div style="flex:1">
+              ${["S","A","B+","B","C"].map(g=>{
+                const cnt=gCounts[g]||0;
+                const pct=totalG?(cnt/totalG*100):0;
+                return `<div class="grade-row">
+                  <span class="grade-label" style="color:${GC[g]}">${g}</span>
+                  <div class="grade-bar-bg"><div class="grade-bar-fill" style="width:${pct}%;background:${GC[g]}"></div></div>
+                  <span class="grade-count">${cnt}</span>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+        ${buCmpHtml}
+        <div class="card ${selBU!=='전체'||selOF!=='전체'?'grid-span':''}">
+          <div class="rank-grid-mobile" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            <div>
+              <div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--green)">▲ Top 10 (3월)</div>
+              ${top10.map((x,i)=>rankItemHtml(x,i,true)).join('')}
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--red)">▼ Bottom 10 (3월)</div>
+              ${bot10.map((x,i)=>rankItemHtml(x,i,false)).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Charts
+  buildTrendChart('chartTrendMini',220,true);
+  buildPieChart('chartPie',gCounts);
+  if(selBU==="전체") buildBuCmpChart('chartBuCmp');
+}
+
+function buildSubTable(title,rows,labelKey){
+  return `<div class="card">
+    <div style="padding:0 0 10px;font-size:13px;font-weight:700;border-bottom:1px solid var(--blight)">${title}</div>
+    <table>
+      <thead><tr>
+        <th class="left" style="font-size:10px">${labelKey==="bu"?"사업부":labelKey==="hosp"?"병원명":"사무소"}</th>
+        <th style="font-size:10px">처수</th><th style="font-size:10px">병상</th><th style="font-size:10px">가동</th>
+        <th style="font-size:10px">3월</th><th style="font-size:10px">2월</th><th style="font-size:10px">변동</th><th style="font-size:10px">등급</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(row=>{
+          const g=getGrade(row.mar);
+          const deltaColor=row.delta!=null?(row.delta>=0?'var(--green)':'var(--red)'):'var(--mute)';
+          const deltaText=row.delta!=null?((row.delta>=0?"+":"")+row.delta.toFixed(1)):"-";
+          return `<tr class="row-border">
+            <td class="td-left" style="font-weight:600;font-size:12px">${esc(row.label)}</td>
+            <td style="color:var(--dim)">${row.count}</td>
+            <td style="color:var(--dim)">${row.beds.toLocaleString()}</td>
+            <td style="color:var(--dim)">${row.active}</td>
+            <td class="${rateClass(g)}" style="border-radius:4px">${row.mar!=null?row.mar.toFixed(1)+"%":"-"}</td>
+            <td style="color:var(--dim)">${row.feb!=null?row.feb.toFixed(1)+"%":"-"}</td>
+            <td style="font-weight:700;color:${deltaColor}">${deltaText}</td>
+            <td>${badgeHtml(g)}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function rankItemHtml(x,i,isTop){
+  const color=isTop?'var(--green)':'var(--red)';
+  const bg=isTop?(i<3?'#dcfce7':'#f1f5f9'):'#fef2f2';
+  const numColor=isTop?(i<3?'var(--green)':'var(--mute)'):'var(--red)';
+  const tagCls=x.t==="기존"?"tag-legacy":"tag-tuning";
+  return `<div class="rank-item">
+    <span class="rank-num" style="background:${bg};color:${numColor}">${i+1}</span>
+    <span class="rank-name">${esc(x.h)}</span>
+    <span class="rank-bu">${esc(x.bu)}</span>
+    <span class="tag ${tagCls}">${esc(x.t)}</span>
+    <span class="rank-val" style="color:${color}">${x.r[7]!=null?x.r[7].toFixed(1)+"%":"-"}</span>
+    ${badgeHtml(getGrade(x.r[7]))}
+  </div>`;
+}
+
+// ─── TREND TAB ──────────────────────────────────────
+function renderTrend(el){
+  const titleLabel=(selBU!=="전체"?selBU:"전체")+(selOF!=="전체"?" > "+selOF:"");
+  const filtered=getFiltered();
+  const sorted=[...filtered].sort((a,b)=>(b.r[7]!=null?b.r[7]:-1)-(a.r[7]!=null?a.r[7]:-1));
+
+  // Monthly BU table
+  const buTableRows=SUM.filter(s=>s.type==="합계").map((s,i)=>{
+    const isTot=s.bu==="전체";
+    return `<tr class="row-border ${isTot?'total-row':''}">
+      <td class="td-left" style="font-weight:${isTot?700:500}">${s.bu}</td>
+      <td style="color:var(--dim);font-size:10px">${s.ct}</td>
+      <td style="color:var(--dim);font-size:10px">${s.tb.toLocaleString()}</td>
+      ${s.m.map(v=>rateCell(v)).join('')}
+      <td style="font-weight:700;color:var(--amber);font-size:11px">${s.ca.toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div class="flex-col">
+      <div class="card" style="padding:20px">
+        <div class="card-title">월별 가동률 추이 (${titleLabel})</div>
+        <div class="chart-container"><canvas id="chartTrendFull" height="300"></canvas></div>
+      </div>
+      <div class="card" style="padding:20px">
+        <div class="card-title">사업부별 월별 가동률 (기존+튜닝)</div>
+        <table>
+          <thead><tr>
+            <th class="left" style="font-size:10px">사업부</th>
+            <th style="font-size:10px">처수</th><th style="font-size:10px">병상</th>
+            ${MS.map(m=>`<th style="font-size:9px">${m}</th>`).join('')}
+            <th style="color:var(--amber);font-weight:700;font-size:10px">누적</th>
+          </tr></thead>
+          <tbody>${buTableRows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  buildTrendChart('chartTrendFull',300,false);
+}
+
+// ─── HOSPITALS TAB ──────────────────────────────────
+function renderHospitals(el){
+  const filtered=getFiltered();
+  const sorted=[...filtered].sort((a,b)=>(b.r[7]!=null?b.r[7]:-1)-(a.r[7]!=null?a.r[7]:-1));
+  const titleLabel=(selBU!=="전체"?selBU:"전체")+(selOF!=="전체"?" > "+selOF:"");
+
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-title">거래처별 상세
+        <span style="font-size:12px;color:var(--mute);font-weight:400;margin-left:8px">(${sorted.length}개 · ${titleLabel} · ${tf})</span>
+      </div>
+      <table>
+        <thead><tr>
+          <th style="font-size:9px">#</th>
+          <th class="left" style="font-size:9px">유형</th>
+          <th class="left" style="font-size:9px">사업부</th>
+          <th class="left" style="font-size:9px">사무소</th>
+          <th class="left" style="font-size:9px">담당자</th>
+          <th class="left" style="font-size:9px;min-width:100px">병원명</th>
+          <th style="font-size:9px;text-align:right">병상</th>
+          ${MS.map(m=>`<th style="font-size:8px;min-width:44px">${m}</th>`).join('')}
+          <th style="color:var(--amber);font-weight:700;font-size:9px">누적</th>
+          <th style="font-size:9px">등급</th>
+        </tr></thead>
         <tbody>
-          {rows.map((row, i) => {
-            const g = getGrade(row.mar);
-            return (
-              <tr key={i} style={{borderBottom:"1px solid #f1f5f9"}}>
-                <td style={{padding:"8px 14px",fontWeight:600,fontSize:12}}>{row.label}</td>
-                <td style={{padding:"8px 8px",textAlign:"center",color:P.dim}}>{row.count}</td>
-                <td style={{padding:"8px 8px",textAlign:"center",color:P.dim}}>{row.beds.toLocaleString()}</td>
-                <td style={{padding:"8px 8px",textAlign:"center",color:P.dim}}>{row.active}</td>
-                <td style={{padding:"8px 8px",textAlign:"center",fontWeight:700,
-                  color:row.mar != null ? GC[g] : P.mute,
-                  background:row.mar != null ? GBG[g] : "transparent",borderRadius:4}}>
-                  {row.mar != null ? row.mar.toFixed(1) + "%" : "-"}
-                </td>
-                <td style={{padding:"8px 8px",textAlign:"center",color:P.dim}}>
-                  {row.feb != null ? row.feb.toFixed(1) + "%" : "-"}
-                </td>
-                <td style={{padding:"8px 8px",textAlign:"center",fontWeight:700,
-                  color:row.delta != null ? (row.delta >= 0 ? P.green : P.red) : P.mute}}>
-                  {row.delta != null ? (row.delta >= 0 ? "+" : "") + row.delta.toFixed(1) : "-"}
-                </td>
-                <td style={{padding:"8px 8px",textAlign:"center"}}><Badge grade={g} /></td>
-              </tr>
-            );
-          })}
+          ${sorted.map((x,i)=>{
+            const tagCls=x.t==="기존"?"tag-legacy":"tag-tuning";
+            return `<tr class="row-border ${i%2?'alt':''}">
+              <td style="color:var(--mute);font-size:9px">${i+1}</td>
+              <td style="text-align:left"><span class="tag ${tagCls}">${x.t}</span></td>
+              <td style="text-align:left;font-size:10px;color:var(--dim)">${esc(x.bu)}</td>
+              <td style="text-align:left;font-size:10px;color:var(--dim)">${esc(x.of)}</td>
+              <td style="text-align:left;font-size:10px;color:var(--dim)">${esc(x.rp)}</td>
+              <td style="text-align:left;font-size:11px;font-weight:500;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.h)}</td>
+              <td style="text-align:right;color:var(--dim);font-size:10px">${x.b}</td>
+              ${x.r.map(v=>rateCell(v)).join('')}
+              <td style="font-weight:700;color:var(--amber);font-size:11px">${x.ca!=null?x.ca.toFixed(1)+"%":"-"}</td>
+              <td>${badgeHtml(getGrade(x.ca))}</td>
+            </tr>`;
+          }).join('')}
         </tbody>
       </table>
     </div>
-  );
+  `;
 }
 
-function RankItem({x, i, isTop}) {
-  const color = isTop ? P.green : P.red;
-  const bg = isTop ? (i < 3 ? "#dcfce7" : "#f1f5f9") : "#fef2f2";
-  return (
-    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,padding:"3px 0"}}>
-      <span style={{width:18,height:18,borderRadius:4,background:bg,
-        display:"flex",alignItems:"center",justifyContent:"center",
-        fontSize:9,fontWeight:800,color:isTop ? (i < 3 ? P.green : P.mute) : P.red,
-        flexShrink:0}}>{i + 1}</span>
-      <span style={{flex:1,fontSize:11,fontWeight:500,overflow:"hidden",
-        textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.h}</span>
-      <span style={{fontSize:9,color:P.mute,flexShrink:0}}>{x.bu}</span>
-      <span style={{fontSize:9,padding:"1px 5px",borderRadius:3,
-        color:x.t === "기존" ? P.cyan : P.purple,
-        background:x.t === "기존" ? "#ecfeff" : "#f5f3ff",
-        flexShrink:0,fontWeight:700}}>{x.t}</span>
-      <span style={{fontSize:11,fontWeight:800,color:color,
-        width:48,textAlign:"right",flexShrink:0}}>
-        {x.r[7] != null ? x.r[7].toFixed(1) + "%" : "-"}
-      </span>
-      <Badge grade={getGrade(x.r[7])} />
-    </div>
-  );
-}
+// ─── CHART BUILDERS ─────────────────────────────────
+function buildTrendChart(canvasId, height, mini){
+  const labels=MS;
+  const datasets=[];
 
-export default function Dashboard() {
-  const [selBU, setSelBU] = useState("전체");
-  const [tf, setTf] = useState("합계");
-  const [tab, setTab] = useState("overview");
+  if(selOF!=="전체"){
+    // 사무소 선택: 필터된 병원 데이터에서 월별 평균 직접 계산
+    const filtered=getFiltered();
+    const typeGroups = tf==="합계"
+      ? [["합계",filtered],["기존형",filtered.filter(x=>x.t==="기존")],["튜닝형",filtered.filter(x=>x.t==="튜닝")]]
+      : [[tf,filtered]];
 
-  const filtered = useMemo(() => {
-    let l = HOSP;
-    if (selBU !== "전체") l = l.filter(x => x.bu === selBU);
-    if (tf === "기존형") l = l.filter(x => x.t === "기존");
-    else if (tf === "튜닝형") l = l.filter(x => x.t === "튜닝");
-    return l;
-  }, [selBU, tf]);
-
-  const kpi = useMemo(() => {
-    const a = calcAgg(filtered);
-    const s = SUM.find(x => x.bu === (selBU !== "전체" ? selBU : "전체") && x.type === tf)
-      || SUM.find(x => x.bu === "전체" && x.type === "합계");
-    return { ...a, contracts: s ? s.ct : a.count, totalBeds: s ? s.tb : a.beds, cumAvg: s ? s.ca : 0 };
-  }, [filtered, selBU, tf]);
-
-  const trendData = useMemo(() => {
-    const bu = selBU !== "전체" ? selBU : "전체";
-    return MS.map((m, i) => {
-      const row = { month: m };
-      ["합계","기존형","튜닝형"].forEach(t => {
-        const s = SUM.find(x => x.bu === bu && x.type === t);
-        if (s) row[t] = s.m[i];
+    typeGroups.forEach(([type,list])=>{
+      if(!list.length) return;
+      const monthData=MS.map((_,i)=>{
+        const w=list.filter(x=>x.r[i]!=null);
+        return w.length?w.reduce((a,x)=>a+x.r[i],0)/w.length:null;
       });
-      return row;
+      const color=type==="합계"?"#2563eb":type==="기존형"?"#0891b2":"#7c3aed";
+      const isMain=type===tf;
+      datasets.push({
+        label:type, data:monthData, borderColor:color, backgroundColor:color+'22',
+        borderWidth:tf==="합계"?(type==="합계"?3:1.5):(isMain?3:0),
+        borderDash:tf==="합계"&&type!=="합계"?[5,3]:[],
+        pointRadius:(tf==="합계"&&type==="합계")||isMain?4:0,
+        pointBackgroundColor:color, tension:0.3, spanGaps:true,
+        hidden:tf!=="합계"&&type!==tf,
+      });
     });
-  }, [selBU]);
+  } else {
+    // 사업부 전체 또는 전체: SUM 데이터 사용
+    const bu=selBU!=="전체"?selBU:"전체";
+    ["합계","기존형","튜닝형"].forEach(type=>{
+      const s=SUM.find(x=>x.bu===bu&&x.type===type);
+      if(!s) return;
+      const color=type==="합계"?"#2563eb":type==="기존형"?"#0891b2":"#7c3aed";
+      const isMain=type===tf;
+      const show=tf==="합계"||(type===tf);
+      datasets.push({
+        label:type, data:s.m.map(v=>v), borderColor:color, backgroundColor:color+'22',
+        borderWidth:tf==="합계"?(type==="합계"?3:1.5):(isMain?3:0),
+        borderDash:tf==="합계"&&type!=="합계"?[5,3]:[],
+        pointRadius:(tf==="합계"&&type==="합계")||isMain?4:0,
+        pointBackgroundColor:color, tension:0.3, spanGaps:true,
+        hidden:!show&&tf!=="합계",
+      });
+    });
+  }
 
-  const buRows = useMemo(() => {
-    const bus = ["서울1","서울2","지방1","지방2"];
-    return bus.map(bu => {
-      let l = HOSP.filter(x => x.bu === bu);
-      if (tf === "기존형") l = l.filter(x => x.t === "기존");
-      else if (tf === "튜닝형") l = l.filter(x => x.t === "튜닝");
-      if (!l.length) return null;
-      return { label: bu, ...calcAgg(l) };
-    }).filter(Boolean);
-  }, [tf]);
+  const ctx=document.getElementById(canvasId);
+  if(!ctx) return;
+  charts[canvasId]=new Chart(ctx,{
+    type:'line',
+    data:{labels,datasets},
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{labels:{font:{size:11},usePointStyle:true,pointStyle:'circle'}},
+        tooltip:{
+          backgroundColor:'#0f172a',titleColor:'#94a3b8',bodyColor:'#f1f5f9',
+          borderColor:'#334155',borderWidth:1,cornerRadius:10,
+          callbacks:{label:ctx=>ctx.parsed.y!=null?ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+'%':ctx.dataset.label+': -'}
+        },
+      },
+      scales:{
+        y:{beginAtZero:true,ticks:{font:{size:10},color:'#94a3b8',callback:v=>v+'%'},
+          grid:{color:'#e2e8f0'}},
+        x:{ticks:{font:{size:mini?10:11},color:'#475569'},grid:{display:false}}
+      },
+      animation:{duration:400}
+    }
+  });
+}
 
-  const officeRows = useMemo(() => {
-    if (selBU === "전체") return [];
-    let l = HOSP.filter(x => x.bu === selBU);
-    if (tf === "기존형") l = l.filter(x => x.t === "기존");
-    else if (tf === "튜닝형") l = l.filter(x => x.t === "튜닝");
-    const offices = [...new Set(l.map(x => x.of))].sort();
-    return offices.map(of => ({ label: of, ...calcAgg(l.filter(x => x.of === of)) }));
-  }, [selBU, tf]);
+function buildPieChart(canvasId,gCounts){
+  const grades=["S","A","B+","B","C"];
+  const data=grades.map(g=>gCounts[g]||0);
+  const colors=grades.map(g=>GC[g]);
+  const ctx=document.getElementById(canvasId);
+  if(!ctx) return;
+  charts[canvasId]=new Chart(ctx,{
+    type:'doughnut',
+    data:{labels:grades,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},
+    options:{
+      responsive:true,
+      cutout:'55%',
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#0f172a',titleColor:'#94a3b8',bodyColor:'#f1f5f9',
+          borderColor:'#334155',borderWidth:1,cornerRadius:10,
+        }
+      },
+      animation:{duration:400}
+    }
+  });
+}
 
-  const gradeDist = useMemo(() => {
-    const g = { S:0, A:0, "B+":0, B:0, C:0 };
-    filtered.forEach(x => { const v = getGrade(x.r[7]); if (v) g[v]++; });
-    return Object.entries(g).map(([n, v]) => ({ name: n, value: v })).filter(d => d.value > 0);
-  }, [filtered]);
-
-  const topBot = useMemo(() => {
-    const w = filtered.filter(x => x.r[7] != null).sort((a, b) => b.r[7] - a.r[7]);
-    return { top: w.slice(0, 10), bottom: w.slice(-10).reverse() };
-  }, [filtered]);
-
-  const sorted = useMemo(
-    () => [...filtered].sort((a, b) => (b.r[7] != null ? b.r[7] : -1) - (a.r[7] != null ? a.r[7] : -1)),
-    [filtered]
-  );
-
-  const titleLabel = selBU !== "전체" ? selBU : "전체";
-
-  const buCmp = useMemo(() => {
-    const bus = ["서울1","서울2","지방1","지방2"];
-    return bus.map(bu => {
-      const s = SUM.find(x => x.bu === bu && x.type === tf);
-      if (!s) return null;
-      const feb = s.m[6];
-      const mar = s.m[7];
-      return { bu, feb, mar, delta: mar != null && feb != null ? mar - feb : null };
-    }).filter(Boolean);
-  }, [tf]);
-
-  const navBus = ["서울1","서울2","지방1","지방2"];
-
-  const btnStyle = (active) => ({
-    padding:"5px 12px",borderRadius:7,fontSize:12,
-    fontWeight:active ? 700 : 500,cursor:"pointer",
-    background:active ? P.accent : "#fff",
-    color:active ? "#fff" : P.dim,
-    border: "1px solid " + (active ? P.accent : P.border)
+function buildBuCmpChart(canvasId){
+  const bus=["서울1","서울2","지방1","지방2"];
+  const data=bus.map(bu=>{
+    const s=SUM.find(x=>x.bu===bu&&x.type===tf);
+    if(!s) return{bu,feb:0,mar:0};
+    return{bu,feb:s.m[6],mar:s.m[7]};
   });
 
-  return (
-    <div style={{background:"#f8fafc",minHeight:"100vh",color:P.text,
-      fontFamily:"system-ui,sans-serif",padding:"20px 24px"}}>
-
-      <div style={{display:"flex",justifyContent:"space-between",
-        alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:20}}>
-        <div>
-          <div style={{fontSize:10,fontWeight:700,color:P.accent,
-            letterSpacing:2,textTransform:"uppercase",marginBottom:2}}>
-            thynC 경영진 보고
-          </div>
-          <h1 style={{fontSize:22,fontWeight:800,margin:0}}>
-            사용량 비례형 병상가동률 대시보드
-          </h1>
-          <div style={{fontSize:11,color:P.mute,marginTop:2}}>
-            {"26.03.30 기준 · S≥70% · A≥60% · B+≥50% · B≥40% · C<40%"}
-          </div>
-        </div>
-        <div style={{display:"flex",gap:6}}>
-          {["합계","기존형","튜닝형"].map(t => (
-            <button key={t} onClick={() => setTf(t)} style={{
-              padding:"6px 14px",borderRadius:8,fontSize:12,
-              fontWeight:tf === t ? 700 : 500,cursor:"pointer",
-              background:tf === t ? (t === "기존형" ? "#ecfeff" : t === "튜닝형" ? "#f5f3ff" : "#eff6ff") : "#fff",
-              color:tf === t ? (t === "기존형" ? P.cyan : t === "튜닝형" ? P.purple : P.accent) : P.mute,
-              border:"1.5px solid " + (tf === t ? (t === "기존형" ? P.cyan : t === "튜닝형" ? P.purple : P.accent) : P.border)
-            }}>
-              {t === "합계" ? "기존+튜닝" : t}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16,alignItems:"center"}}>
-        <span style={{fontSize:10,color:P.mute,fontWeight:700}}>사업부</span>
-        <button onClick={() => setSelBU("전체")} style={btnStyle(selBU === "전체")}>전체</button>
-        {navBus.map(bu => (
-          <button key={bu}
-            onClick={() => setSelBU(bu)}
-            style={btnStyle(selBU === bu)}>
-            {bu}
-          </button>
-        ))}
-      </div>
-
-      <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
-        <Kpi label="3월 가동률"
-          value={kpi.mar != null ? kpi.mar.toFixed(1) + "%" : "-"}
-          delta={kpi.delta}
-          color={kpi.mar >= 40 ? P.green : kpi.mar >= 25 ? P.amber : P.red} />
-        <Kpi label="계약 처수" value={kpi.contracts}
-          sub={"가동 " + kpi.active + "개 처"} />
-        <Kpi label="누계 병상수" value={kpi.totalBeds.toLocaleString()}
-          sub={"가동 " + kpi.beds.toLocaleString() + " 병상"} />
-        <Kpi label="누적 평균" value={kpi.cumAvg.toFixed(1) + "%"}
-          color={P.amber} sub={titleLabel + " · " + tf} />
-      </div>
-
-      <div style={{display:"flex",gap:2,marginBottom:18,borderBottom:"2px solid #e2e8f0"}}>
-        {[["overview","종합 현황"],["trend","월별 추이"],["hospitals","거래처 상세"]].map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} style={{
-            padding:"9px 18px",fontSize:13,fontWeight:tab === k ? 700 : 500,
-            cursor:"pointer",background:tab === k ? "#fff" : "transparent",
-            border:"none",borderBottom:"2px solid " + (tab === k ? P.accent : "transparent"),
-            color:tab === k ? P.accent : P.mute,marginBottom:-2
-          }}>{l}</button>
-        ))}
-      </div>
-
-      {tab === "overview" && (
-        <div style={{display:"flex",flexDirection:"column",gap:16}}>
-          {selBU === "전체"
-            ? <SubTable title={"사업부별 현황 (" + titleLabel + " · " + tf + ")"} rows={buRows} labelKey="bu" />
-            : <SubTable title={"사무소별 현황 (" + selBU + " · " + tf + ")"} rows={officeRows} labelKey="of" />
-          }
-
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-            <div style={{background:"#fff",borderRadius:12,padding:18,
-              border:"1px solid #e2e8f0",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-              <div style={{fontSize:13,fontWeight:700,marginBottom:14}}>
-                월별 가동률 추이 ({titleLabel})
-              </div>
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={trendData} margin={{top:5,right:15,bottom:5,left:-5}}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="month" tick={{fill:P.mute,fontSize:10}} />
-                  <YAxis tick={{fill:P.mute,fontSize:10}} domain={[0,"auto"]} unit="%" />
-                  <Tooltip contentStyle={TT}
-                    itemStyle={{color:"#f1f5f9"}}
-                    labelStyle={{color:"#94a3b8",fontWeight:700}}
-                    formatter={v => v != null ? v.toFixed(1) + "%" : "-"} />
-                  <ReferenceLine y={40} stroke={P.amber} strokeDasharray="4 4" strokeWidth={1} />
-                  <Line type="monotone" dataKey="합계" stroke={P.accent}
-                    strokeWidth={tf === "합계" ? 3 : 0}
-                    dot={tf === "합계" ? {fill:P.accent,r:4} : false}
-                    connectNulls name="합계" />
-                  <Line type="monotone" dataKey="기존형" stroke={P.cyan}
-                    strokeWidth={tf === "기존형" ? 3 : (tf === "합계" ? 1.5 : 0)}
-                    strokeDasharray={tf === "합계" ? "5 3" : undefined}
-                    dot={tf === "기존형" ? {fill:P.cyan,r:4} : false}
-                    connectNulls name="기존형" />
-                  <Line type="monotone" dataKey="튜닝형" stroke={P.purple}
-                    strokeWidth={tf === "튜닝형" ? 3 : (tf === "합계" ? 1.5 : 0)}
-                    strokeDasharray={tf === "합계" ? "5 3" : undefined}
-                    dot={tf === "튜닝형" ? {fill:P.purple,r:4} : false}
-                    connectNulls name="튜닝형" />
-                  <Legend wrapperStyle={{fontSize:11}} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div style={{background:"#fff",borderRadius:12,padding:18,
-              border:"1px solid #e2e8f0",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-              <div style={{fontSize:13,fontWeight:700,marginBottom:14}}>
-                3월 등급 분포 ({filtered.filter(x => x.r[7] != null).length}개 처)
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <ResponsiveContainer width="45%" height={200}>
-                  <PieChart>
-                    <Pie data={gradeDist} dataKey="value" nameKey="name"
-                      cx="50%" cy="50%" innerRadius={42} outerRadius={72} paddingAngle={3}>
-                      {gradeDist.map((d, i) => <Cell key={i} fill={GC[d.name]} />)}
-                    </Pie>
-                    <Tooltip contentStyle={TT} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div style={{flex:1}}>
-                  {["S","A","B+","B","C"].map(g => {
-                    const d = gradeDist.find(x => x.name === g);
-                    const total = gradeDist.reduce((a, b) => a + b.value, 0);
-                    const pct = d && total ? (d.value / total * 100) : 0;
-                    return (
-                      <div key={g} style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
-                        <span style={{width:26,fontSize:11,fontWeight:800,color:GC[g]}}>{g}</span>
-                        <div style={{flex:1,height:12,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
-                          <div style={{width:pct + "%",height:"100%",background:GC[g],borderRadius:3}} />
-                        </div>
-                        <span style={{width:28,fontSize:11,fontWeight:700,color:P.dim,textAlign:"right"}}>
-                          {d ? d.value : 0}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {selBU === "전체" && (
-              <div style={{background:"#fff",borderRadius:12,padding:18,
-                border:"1px solid #e2e8f0",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-                <div style={{fontSize:13,fontWeight:700,marginBottom:14}}>사업부별 2월 vs 3월</div>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={buCmp} margin={{top:10,right:15,bottom:5,left:-5}}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="bu" tick={{fill:P.dim,fontSize:11}} />
-                    <YAxis tick={{fill:P.mute,fontSize:10}} domain={[0,"auto"]} unit="%" />
-                    <Tooltip contentStyle={TT} itemStyle={{color:"#f1f5f9"}}
-                      labelStyle={{color:"#94a3b8",fontWeight:700}}
-                      formatter={v => (v != null ? v.toFixed(1) : 0) + "%"} />
-                    <Bar dataKey="feb" name="2월" fill="#cbd5e1" radius={[4,4,0,0]} barSize={22} />
-                    <Bar dataKey="mar" name="3월" radius={[4,4,0,0]} barSize={22}>
-                      {buCmp.map((d, i) => (
-                        <Cell key={i} fill={d.delta >= 0 ? P.green : P.red} />
-                      ))}
-                    </Bar>
-                    <Legend wrapperStyle={{fontSize:11}} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            <div style={{background:"#fff",borderRadius:12,padding:18,
-              border:"1px solid #e2e8f0",boxShadow:"0 1px 3px rgba(0,0,0,.04)",
-              gridColumn: selBU !== "전체" ? "1 / -1" : undefined}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
-                <div>
-                  <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:P.green}}>
-                    ▲ Top 10 (3월)
-                  </div>
-                  {topBot.top.map((x, i) => (
-                    <RankItem key={i} x={x} i={i} isTop={true} />
-                  ))}
-                </div>
-                <div>
-                  <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:P.red}}>
-                    ▼ Bottom 10 (3월)
-                  </div>
-                  {topBot.bottom.map((x, i) => (
-                    <RankItem key={i} x={x} i={i} isTop={false} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {tab === "trend" && (
-        <div style={{display:"flex",flexDirection:"column",gap:16}}>
-          <div style={{background:"#fff",borderRadius:12,padding:20,
-            border:"1px solid #e2e8f0",boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-            <div style={{fontSize:14,fontWeight:700,marginBottom:18}}>
-              월별 가동률 추이 ({titleLabel})
-            </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={trendData} margin={{top:10,right:25,bottom:10,left:0}}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="month" tick={{fill:P.dim,fontSize:11}} />
-                <YAxis tick={{fill:P.mute,fontSize:10}} domain={[0,"auto"]} unit="%" />
-                <Tooltip contentStyle={TT} itemStyle={{color:"#f1f5f9"}}
-                  labelStyle={{color:"#94a3b8",fontWeight:700}}
-                  formatter={v => v != null ? v.toFixed(1) + "%" : "-"} />
-                <ReferenceLine y={70} stroke="#2563eb" strokeDasharray="3 3" strokeWidth={0.5} />
-                <ReferenceLine y={60} stroke="#3b82f6" strokeDasharray="3 3" strokeWidth={0.5} />
-                <ReferenceLine y={50} stroke="#94a3b8" strokeDasharray="3 3" strokeWidth={0.5} />
-                <ReferenceLine y={40} stroke="#cbd5e1" strokeDasharray="3 3" strokeWidth={0.5} />
-                <Line type="monotone" dataKey="합계" stroke={P.accent} strokeWidth={3}
-                  dot={{fill:P.accent,r:5}} connectNulls name="합계" />
-                <Line type="monotone" dataKey="기존형" stroke={P.cyan} strokeWidth={2}
-                  dot={{fill:P.cyan,r:3}} connectNulls name="기존형" />
-                <Line type="monotone" dataKey="튜닝형" stroke={P.purple} strokeWidth={2}
-                  dot={{fill:P.purple,r:3}} connectNulls name="튜닝형" />
-                <Legend wrapperStyle={{fontSize:11}} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div style={{background:"#fff",borderRadius:12,padding:20,
-            border:"1px solid #e2e8f0",overflowX:"auto",
-            boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-            <div style={{fontSize:14,fontWeight:700,marginBottom:14}}>
-              사업부별 월별 가동률 (기존+튜닝)
-            </div>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-              <thead>
-                <tr style={{background:"#f8fafc"}}>
-                  <th style={{padding:"7px 12px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:10}}>사업부</th>
-                  <th style={{padding:"7px 6px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>처수</th>
-                  <th style={{padding:"7px 6px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:10}}>병상</th>
-                  {MS.map(m => (
-                    <th key={m} style={{padding:"7px 5px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:9}}>{m}</th>
-                  ))}
-                  <th style={{padding:"7px 6px",textAlign:"center",color:P.amber,fontWeight:700,fontSize:10}}>누적</th>
-                </tr>
-              </thead>
-              <tbody>
-                {SUM.filter(s => s.type === "합계").map((s, i) => (
-                  <tr key={i} style={{borderBottom:"1px solid #f1f5f9",
-                    background:s.bu === "전체" ? "#f8fafc" : "transparent"}}>
-                    <td style={{padding:"7px 12px",fontWeight:s.bu === "전체" ? 700 : 500}}>{s.bu}</td>
-                    <td style={{padding:"7px 6px",textAlign:"center",color:P.dim,fontSize:10}}>{s.ct}</td>
-                    <td style={{padding:"7px 6px",textAlign:"center",color:P.dim,fontSize:10}}>{s.tb.toLocaleString()}</td>
-                    {s.m.map((v, j) => <RateCell key={j} v={v} />)}
-                    <td style={{padding:"7px 6px",textAlign:"center",fontWeight:700,color:P.amber,fontSize:11}}>
-                      {s.ca.toFixed(1)}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {tab === "hospitals" && (
-        <div style={{background:"#fff",borderRadius:12,padding:18,
-          border:"1px solid #e2e8f0",overflowX:"auto",
-          boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-          <div style={{fontSize:14,fontWeight:700,marginBottom:14}}>
-            거래처별 상세
-            <span style={{fontSize:12,color:P.mute,fontWeight:400,marginLeft:8}}>
-              ({sorted.length}개 · {titleLabel} · {tf})
-            </span>
-          </div>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-            <thead>
-              <tr style={{background:"#f8fafc"}}>
-                <th style={{padding:"7px 6px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:9}}>#</th>
-                <th style={{padding:"7px 6px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:9}}>유형</th>
-                <th style={{padding:"7px 6px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:9}}>사업부</th>
-                <th style={{padding:"7px 6px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:9}}>사무소</th>
-                <th style={{padding:"7px 6px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:9}}>담당자</th>
-                <th style={{padding:"7px 6px",textAlign:"left",color:P.mute,fontWeight:600,fontSize:9,minWidth:100}}>병원명</th>
-                <th style={{padding:"7px 6px",textAlign:"right",color:P.mute,fontWeight:600,fontSize:9}}>병상</th>
-                {MS.map(m => (
-                  <th key={m} style={{padding:"7px 3px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:8,minWidth:44}}>{m}</th>
-                ))}
-                <th style={{padding:"7px 5px",textAlign:"center",color:P.amber,fontWeight:700,fontSize:9}}>누적</th>
-                <th style={{padding:"7px 5px",textAlign:"center",color:P.mute,fontWeight:600,fontSize:9}}>등급</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((x, i) => (
-                <tr key={i} style={{borderBottom:"1px solid #f1f5f9",
-                  background:i % 2 === 0 ? "transparent" : "#fafbfc"}}>
-                  <td style={{padding:"5px 6px",textAlign:"center",color:P.mute,fontSize:9}}>{i + 1}</td>
-                  <td style={{padding:"5px 6px"}}>
-                    <span style={{fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:3,
-                      color:x.t === "기존" ? P.cyan : P.purple,
-                      background:x.t === "기존" ? "#ecfeff" : "#f5f3ff"}}>{x.t}</span>
-                  </td>
-                  <td style={{padding:"5px 6px",fontSize:10,color:P.dim}}>{x.bu}</td>
-                  <td style={{padding:"5px 6px",fontSize:10,color:P.dim}}>{x.of}</td>
-                  <td style={{padding:"5px 6px",fontSize:10,color:P.dim}}>{x.rp}</td>
-                  <td style={{padding:"5px 6px",fontSize:11,fontWeight:500,maxWidth:140,
-                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.h}</td>
-                  <td style={{padding:"5px 6px",textAlign:"right",color:P.dim,fontSize:10}}>{x.b}</td>
-                  {x.r.map((v, j) => <RateCell key={j} v={v} />)}
-                  <td style={{padding:"5px 5px",textAlign:"center",fontWeight:700,color:P.amber,fontSize:11}}>
-                    {x.ca != null ? x.ca.toFixed(1) + "%" : "-"}
-                  </td>
-                  <td style={{padding:"5px 5px",textAlign:"center"}}>
-                    <Badge grade={getGrade(x.ca)} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div style={{marginTop:20,padding:"12px 0",borderTop:"1px solid #e2e8f0",
-        display:"flex",justifyContent:"space-between"}}>
-        <div style={{fontSize:10,color:P.mute}}>대웅제약 디지털헬스2팀 · thynC 사용량 비례형 병상가동률</div>
-        <div style={{fontSize:10,color:P.mute}}>데이터 기준일: 2026.03.30</div>
-      </div>
-    </div>
-  );
+  const ctx=document.getElementById(canvasId);
+  if(!ctx) return;
+  charts[canvasId]=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:bus,
+      datasets:[
+        {label:'2월',data:data.map(d=>d.feb),backgroundColor:'#cbd5e1',borderRadius:4,barPercentage:0.5},
+        {label:'3월',data:data.map(d=>d.mar),
+          backgroundColor:data.map(d=>d.mar>=d.feb?'#16a34a':'#dc2626'),borderRadius:4,barPercentage:0.5}
+      ]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{font:{size:11},usePointStyle:true,pointStyle:'circle'}},
+        tooltip:{
+          backgroundColor:'#0f172a',titleColor:'#94a3b8',bodyColor:'#f1f5f9',
+          borderColor:'#334155',borderWidth:1,cornerRadius:10,
+          callbacks:{label:ctx=>ctx.dataset.label+': '+(ctx.parsed.y!=null?ctx.parsed.y.toFixed(1):0)+'%'}
+        }
+      },
+      scales:{
+        y:{beginAtZero:true,ticks:{font:{size:10},color:'#94a3b8',callback:v=>v+'%'},grid:{color:'#e2e8f0'}},
+        x:{ticks:{font:{size:11},color:'#475569'},grid:{display:false}}
+      },
+      animation:{duration:400}
+    }
+  });
 }
+
+// ─── MASTER RENDER ──────────────────────────────────
+function render(){
+  renderTypeFilters();
+  renderBuNav();
+  renderOfNav();
+  renderKpis();
+  renderTabs();
+  renderContent();
+}
+
+render();
+</script>
+</body>
+</html>
